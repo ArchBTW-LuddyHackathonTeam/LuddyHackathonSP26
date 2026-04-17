@@ -1,6 +1,0 @@
-[package]
-name = "luddy_hackathon_sp26"
-version = "1.0.0"
-edition = "2024"
-
-[dependencies]

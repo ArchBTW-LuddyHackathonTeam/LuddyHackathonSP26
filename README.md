@@ -1,31 +1,23 @@
 # Leaderboard API
 
-# Build command
+## Start
 
 ```bash
 docker-compose up --build
 ```
 
-# Stop command
+## Stop
 
-```
+```bash
 docker-compose down
 ```
 
-# Test
+API: http://localhost:3000
 
-```bash
-curl http://localhost:3000
-```
+## Demo
 
-## Database Connection
+Demo will go in demo/ dir
 
-From inside the API container:
-```
-postgresql://leaderboard:hackathon@postgres:5432/leaderboard
-```
+## Database
 
-From local:
-```
-postgresql://leaderboard:hackathon@localhost:5432/leaderboard
-```
+`postgresql://leaderboard:hackathon@postgres:5432/leaderboard`
