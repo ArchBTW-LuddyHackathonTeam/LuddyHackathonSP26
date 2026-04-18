@@ -8,6 +8,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
+use tower_http::cors::{Any, CorsLayer};
 
 use crate::{
     config::{Config, LeaderboardSortOrder},
@@ -97,6 +98,11 @@ async fn board_config_handler(State(state): State<AppState>) -> Json<BoardConfig
 }
 
 pub fn app(state: AppState) -> Router {
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any);
+
     Router::new()
         .route("/health", get(|| async { "OK" }))
         .route("/add", post(add_handler))
@@ -106,5 +112,6 @@ pub fn app(state: AppState) -> Router {
         .route("/history", get(history_handler))
         .route("/boardconfig", get(board_config_handler))
         .nest("/admin", routes::admin::router())
+        .layer(cors)
         .with_state(state)
 }

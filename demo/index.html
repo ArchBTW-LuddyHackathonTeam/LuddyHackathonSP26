@@ -10,9 +10,10 @@
     <div class="container">
         <header>
             <h1>LibreBoard</h1>
+            <button id="toggleViewBtn" class="toggle-view-btn">Admin Mode</button>
         </header>
 
-        <main>
+        <main id="regularView">
             <div class="top-grid">
                 <section class="leaderboard-section">
                     <h2>Top 10</h2>
@@ -99,6 +100,46 @@
                             <dd id="infoPerf">0ms</dd>
                         </div>
                     </dl>
+                </section>
+            </div>
+        </main>
+
+        <main id="adminView" style="display: none;">
+            <section class="section admin-auth" id="adminAuthSection">
+                <h2>Admin Authentication</h2>
+                <form id="adminAuthForm">
+                    <input type="password" id="adminToken" placeholder="Enter Admin Token" required>
+                    <button type="submit">Authenticate</button>
+                </form>
+                <div id="adminStatus" class="admin-status"></div>
+            </section>
+
+            <div id="adminPanel" style="display: none;">
+                <section class="section">
+                    <h2>Board Configuration</h2>
+                    <form id="updateTitleForm">
+                        <label>Board Title</label>
+                        <input type="text" id="newTitle" placeholder="New Board Title" required>
+                        <button type="submit">Update Title</button>
+                    </form>
+                </section>
+
+                <section class="section">
+                    <h2>Sort Order</h2>
+                    <form id="updateSortForm">
+                        <label>Leaderboard Sort Order</label>
+                        <select id="sortOrder" required>
+                            <option value="">Select Sort Order</option>
+                            <option value="descending">Descending (High to Low)</option>
+                            <option value="ascending">Ascending (Low to High)</option>
+                        </select>
+                        <button type="submit">Update Sort Order</button>
+                    </form>
+                </section>
+
+                <section class="section">
+                    <h2>Session</h2>
+                    <button type="button" id="logoutAdmin" class="logout-btn">Logout</button>
                 </section>
             </div>
         </main>
