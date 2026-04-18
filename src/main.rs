@@ -7,4 +7,8 @@ async fn main() {
         .connect(std::env::var("DATABASE_URL").unwrap().as_str())
         .await
         .expect("There was an issue connecting to the database");
+    sqlx::migrate!()
+        .run(&pool)
+        .await
+        .expect("There was an issue running migrations");
 }
