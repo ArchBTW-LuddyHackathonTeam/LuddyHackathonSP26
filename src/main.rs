@@ -1,4 +1,4 @@
-use std::io::ErrorKind;
+use std::{io::ErrorKind, sync::Arc};
 
 use clap::Parser;
 use luddy_hackathon_sp26::{
@@ -7,6 +7,7 @@ use luddy_hackathon_sp26::{
     router::{self, AppState},
 };
 use sqlx::postgres::PgPoolOptions;
+use tokio::sync::RwLock;
 
 #[derive(Parser)]
 struct Args {
@@ -75,12 +76,13 @@ async fn main() {
                 .await
                 .expect("There was an issue registering a new token")
         );
+        return;
     }
 
     let server_port = config.server.port;
     let state = AppState {
         db: pool,
-        config: config,
+        config: Arc::new(RwLock::new(config)),
     };
 
     let app = router::app(state);

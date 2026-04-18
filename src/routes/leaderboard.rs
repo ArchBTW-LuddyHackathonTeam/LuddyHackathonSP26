@@ -25,7 +25,7 @@ pub async fn get_leaderboard_json(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<Score>>, StatusCode> {
     Ok(Json(
-        Score::leaderboard(&state.db, state.config.leaderboard.sort_order)
+        Score::leaderboard(&state.db, state.config.read().await.leaderboard.sort_order)
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
     ))
@@ -45,8 +45,12 @@ pub async fn get_leaderboard_json_num(
     Path(num): Path<i32>,
 ) -> Result<Json<Vec<Score>>, StatusCode> {
     Ok(Json(
-        Score::leaderboard_num(&state.db, num, state.config.leaderboard.sort_order)
-            .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+        Score::leaderboard_num(
+            &state.db,
+            num,
+            state.config.read().await.leaderboard.sort_order,
+        )
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
     ))
 }
