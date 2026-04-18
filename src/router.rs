@@ -9,6 +9,6 @@ pub struct AppState {
 
 pub fn app(state: AppState) -> Router {
     Router::new()
-        .route("/healt", get(|| async { "Health" }))
+        .route("/health", get(|| async { "OK" }))
         .with_state(state)
 }
