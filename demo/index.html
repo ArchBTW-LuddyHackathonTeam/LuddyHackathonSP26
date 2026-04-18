@@ -110,6 +110,22 @@
                     </dl>
                 </section>
             </div>
+
+            <section class="section">
+                <h3>History</h3>
+                <div class="history-filters">
+                    <input type="text" id="historyUser" placeholder="Username">
+                    <input type="datetime-local" id="historyStart">
+                    <input type="datetime-local" id="historyEnd">
+                    <button type="button" id="historySearch">Search</button>
+                </div>
+                <div id="historyResults"></div>
+                <div class="history-paging">
+                    <button type="button" id="historyPrev" disabled>Prev</button>
+                    <span id="historyPageLabel">Page 1</span>
+                    <button type="button" id="historyNext">Next</button>
+                </div>
+            </section>
         </main>
 
         <main id="adminView" style="display: none;">

@@ -31,6 +31,8 @@ let stressTestInterval = null;
 let stressTestRunning = false;
 let adminToken = null;
 let currentView = 'regular'; // 'regular' or 'admin'
+let historyPage = 1;
+const historyCount = 10;
 
 function setupEvents() {
     document.getElementById('addEntryForm').addEventListener('submit', handleAdd);
@@ -42,6 +44,10 @@ function setupEvents() {
     document.getElementById('updateTitleForm').addEventListener('submit', handleUpdateTitle);
     document.getElementById('updateSortForm').addEventListener('submit', handleUpdateSort);
     document.getElementById('logoutAdmin').addEventListener('click', handleAdminLogout);
+    document.getElementById('historySearch').addEventListener('click', () => { historyPage = 1; fetchHistory(); });
+    document.getElementById('historyPrev').addEventListener('click', () => { historyPage = Math.max(1, historyPage - 1); fetchHistory(); });
+    document.getElementById('historyNext').addEventListener('click', () => { historyPage++; fetchHistory(); });
+    fetchHistory();
 }
 
 async function fetchLeaderboard() {
@@ -192,6 +198,39 @@ async function fetchPerformance() {
     }
 }
 
+async function fetchHistory() {
+    const params = new URLSearchParams({ count: historyCount, page: historyPage });
+    const title = document.getElementById('historyUser').value.trim();
+    const start = document.getElementById('historyStart').value;
+    const end = document.getElementById('historyEnd').value;
+    if (title) params.set('title', title);
+    if (start) params.set('start', new Date(start).toISOString());
+    if (end) params.set('end', new Date(end).toISOString());
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/history?${params}`);
+        if (!response.ok) return;
+        const data = await response.json();
+        const el = document.getElementById('historyResults');
+        if (data.length === 0) {
+            el.innerHTML = '<div style="text-align:center;padding:16px;color:#888;">No history</div>';
+        } else {
+            el.innerHTML = data.map(e => `
+                <div class="history-row">
+                    <span class="username">${esc(e.uploader)}</span>
+                    <span class="score">${e.value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                    <span class="history-time">${formatTime(e.created_at)}</span>
+                </div>
+            `).join('');
+        }
+        document.getElementById('historyPageLabel').textContent = `Page ${historyPage}`;
+        document.getElementById('historyPrev').disabled = historyPage <= 1;
+        document.getElementById('historyNext').disabled = data.length < historyCount;
+    } catch (error) {
+        console.error('Failed to fetch history:', error);
+    }
+}
+
 function renderLeaderboard() {
     const el = document.getElementById('leaderboard');
     const top10 = leaderboardData.slice(0, 10);
@@ -215,6 +254,10 @@ function showStatus(msg, isError = false) {
     el.textContent = msg;
     el.className = isError ? 'show error' : 'show';
     setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+function formatTime(arr) {
+    return new Date(Date.UTC(arr[0], 0, arr[1], arr[2], arr[3], arr[4])).toLocaleString();
 }
 
 function esc(text) {
@@ -248,7 +291,7 @@ function startStressTest() {
         } catch (error) {
             console.error('Stress test error:', error);
         }
-    }, 0);
+    }, 100);
 }
 
 function stopStressTest() {

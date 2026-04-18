@@ -11,28 +11,41 @@ pub struct ScoreHistory {
 }
 
 impl ScoreHistory {
-    /// TODO
-    pub async fn all(pool: &PgPool, count: i64, page: i64) -> Result<Vec<Self>, sqlx::Error> {
-        sqlx::query_as("SELECT id, uploader, created_at, value FROM score_history ORDER BY created_at DESC LIMIT $1 OFFSET $2")
-            .bind(count)
-            .bind(count*(page - 1))
-            .fetch_all(pool)
-            .await
+    pub async fn query(
+        pool: &PgPool,
+        title: Option<&str>,
+        start: Option<&str>,
+        end: Option<&str>,
+        count: i64,
+        page: i64,
+    ) -> Result<Vec<Self>, sqlx::Error> {
+        sqlx::query_as(
+            "SELECT id, uploader, created_at, value FROM score_history \
+             WHERE ($1::text IS NULL OR uploader = $1) \
+             AND ($2::timestamp IS NULL OR created_at >= $2::timestamp) \
+             AND ($3::timestamp IS NULL OR created_at <= $3::timestamp) \
+             ORDER BY created_at DESC LIMIT $4 OFFSET $5",
+        )
+        .bind(title)
+        .bind(start)
+        .bind(end)
+        .bind(count)
+        .bind(count * (page - 1))
+        .fetch_all(pool)
+        .await
     }
 
-    /// TODO
+    pub async fn all(pool: &PgPool, count: i64, page: i64) -> Result<Vec<Self>, sqlx::Error> {
+        Self::query(pool, None, None, None, count, page).await
+    }
+
     pub async fn from_user(
         pool: &PgPool,
         user: String,
         count: i64,
         page: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
-        sqlx::query_as("SELECT id, uploader, created_at, value FROM score_history WHERE uploader = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3")
-            .bind(user)
-            .bind(count)
-            .bind(count*(page - 1))
-            .fetch_all(pool)
-            .await
+        Self::query(pool, Some(&user), None, None, count, page).await
     }
 
     /// Fetch a single score history entry by its id
@@ -47,7 +60,7 @@ impl ScoreHistory {
     /// Fetch all score histories by an uploader
     pub async fn by_uploader(pool: &PgPool, uploader: String) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            "SELECT id, uploader, created_at, value, FROM score_history where uploader = $1",
+            "SELECT id, uploader, created_at, value FROM score_history WHERE uploader = $1",
         )
         .bind(uploader)
         .fetch_all(pool)
