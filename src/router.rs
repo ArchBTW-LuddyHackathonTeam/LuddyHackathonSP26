@@ -1,8 +1,8 @@
 use axum::{
-    Json, Router,
     extract::{Query, State},
     http::StatusCode,
     routing::{delete, get, post},
+    Json, Router,
 };
 use serde::Deserialize;
 use uuid::Uuid;
@@ -44,12 +44,11 @@ async fn add_handler(
     uploader.truncate(32);
     let value: f64 = req.value;
 
-    Score::delete_by_uploader(&state.db, uploader.clone())
+    Score::delete_by_uploader(&state.db, &uploader)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // TODO: Change these to reference
-    let new_score: Score = Score::create(&state.db, uploader.clone(), value)
+    let new_score: Score = Score::create(&state.db, &uploader, value)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 

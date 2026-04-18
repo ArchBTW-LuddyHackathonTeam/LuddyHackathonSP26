@@ -12,7 +12,7 @@ impl Score {
     /// Fetch a single score by its uploader
     pub async fn from_uploader(
         pool: &PgPool,
-        uploader: String,
+        uploader: &String,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as("SELECT uploader, created_at, value FROM score WHERE uploader = $1")
             .bind(uploader)
@@ -21,7 +21,7 @@ impl Score {
     }
 
     /// Insert a new score and return the created record
-    pub async fn create(pool: &PgPool, uploader: String, value: f64) -> Result<Self, sqlx::Error> {
+    pub async fn create(pool: &PgPool, uploader: &String, value: f64) -> Result<Self, sqlx::Error> {
         sqlx::query_as("INSERT INTO score (uploader, value) VALUES ($1, $2) RETURNING uploader, created_at, value")
                 .bind(uploader)
                 .bind(value)
@@ -39,7 +39,7 @@ impl Score {
     }
 
     /// Directly delete a record by its uploader. Returns the number of rows affected.
-    pub async fn delete_by_uploader(pool: &PgPool, uploader: String) -> Result<u64, sqlx::Error> {
+    pub async fn delete_by_uploader(pool: &PgPool, uploader: &String) -> Result<u64, sqlx::Error> {
         sqlx::query("DELETE FROM score WHERE uploader = $1")
             .bind(uploader)
             .execute(pool)
