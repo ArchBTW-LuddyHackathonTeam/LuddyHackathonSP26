@@ -1,0 +1,269 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+    background: #FFFFFF;
+    color: #000000;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
+
+.container {
+    margin: 0 auto;
+    padding: 60px 200px;
+}
+
+header {
+    margin-bottom: 48px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid #E5E5E5;
+}
+
+h1 {
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+
+h2 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    letter-spacing: -0.01em;
+}
+
+h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #666666;
+}
+
+main {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+}
+
+.top-grid {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: 32px;
+    align-items: start;
+}
+
+.section {
+    padding: 24px;
+    border: 1px solid #E5E5E5;
+    background: #FAFAFA;
+}
+
+.leaderboard-section {
+    padding: 24px;
+    border: 1px solid #E5E5E5;
+}
+
+#leaderboard {
+    display: flex;
+    flex-direction: column;
+}
+
+.leaderboard-item {
+    display: grid;
+    grid-template-columns: 40px 1fr auto;
+    gap: 16px;
+    padding: 16px 0;
+    border-bottom: 1px solid #F0F0F0;
+    align-items: center;
+}
+
+.leaderboard-item:last-child {
+    border-bottom: none;
+}
+
+.rank {
+    font-size: 14px;
+    font-weight: 500;
+    color: #999999;
+    text-align: right;
+}
+
+.username {
+    font-size: 15px;
+    font-weight: 500;
+}
+
+.score {
+    font-size: 15px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.actions-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+input {
+    padding: 10px 12px;
+    border: 1px solid #D0D0D0;
+    background: #FFFFFF;
+    font-size: 14px;
+    font-family: inherit;
+}
+
+input:focus {
+    outline: none;
+    border-color: #000000;
+}
+
+button {
+    padding: 10px 12px;
+    border: 1px solid #000000;
+    background: #000000;
+    color: #FFFFFF;
+    font-size: 14px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+
+button:hover {
+    opacity: 0.8;
+}
+
+button:active {
+    opacity: 0.6;
+}
+
+.stress-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.stress-btn {
+    padding: 10px 12px;
+    border: 1px solid #000000;
+    background: #000000;
+    color: #FFFFFF;
+    font-size: 14px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+
+.stress-btn.stop {
+    background: #FFFFFF;
+    color: #000000;
+}
+
+.stress-btn:hover {
+    opacity: 0.8;
+}
+
+.stress-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.stress-status {
+    font-size: 13px;
+    color: #666666;
+    text-align: center;
+    padding: 8px;
+    background: #F5F5F5;
+    border: 1px solid #E5E5E5;
+}
+
+.data-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 16px;
+}
+
+.data-list > div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+dt {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #999999;
+}
+
+dd {
+    font-size: 18px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+#statusMessage {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    padding: 12px 16px;
+    background: #000000;
+    color: #FFFFFF;
+    font-size: 13px;
+    font-weight: 500;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 0.2s;
+    pointer-events: none;
+}
+
+#statusMessage.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+#statusMessage.error {
+    background: #DC2626;
+}
+
+@media (max-width: 900px) {
+    .top-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .container {
+        padding: 40px 16px;
+    }
+
+    h1 {
+        font-size: 20px;
+    }
+
+    .data-list {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}

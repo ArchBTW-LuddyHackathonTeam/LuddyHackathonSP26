@@ -3,9 +3,108 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leaderboard</title>
+    <title>Leaderboard System</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>Frontend</h1>
+    <div class="container">
+        <header>
+            <h1>LibreBoard</h1>
+        </header>
+
+        <main>
+            <div class="top-grid">
+                <section class="leaderboard-section">
+                    <h2>Top 10</h2>
+                    <div id="leaderboard"></div>
+                </section>
+
+                <div class="actions-grid">
+                    <section class="section">
+                        <h3>Add Entry</h3>
+                        <form id="addEntryForm">
+                            <input type="text" id="username" placeholder="Username" required>
+                            <input type="number" id="score" placeholder="Score" step="any" required>
+                            <button type="submit">Add</button>
+                        </form>
+                    </section>
+
+                    <section class="section">
+                        <h3>Remove Entry</h3>
+                        <form id="removeEntryForm">
+                            <input type="text" id="removeUsername" placeholder="Username" required>
+                            <button type="submit">Remove</button>
+                        </form>
+                    </section>
+
+                    <section class="section">
+                        <h3>Stress Test</h3>
+                        <div class="stress-controls">
+                            <button type="button" id="startStress" class="stress-btn">Start</button>
+                            <button type="button" id="stopStress" class="stress-btn stop">Stop</button>
+                        </div>
+                        <div class="stress-status" id="stressStatus">Idle</div>
+                    </section>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <section class="section">
+                    <h3>Statistics</h3>
+                    <dl class="data-list">
+                        <div>
+                            <dt>Total</dt>
+                            <dd id="totalEntries">0</dd>
+                        </div>
+                        <div>
+                            <dt>Mean</dt>
+                            <dd id="meanScore">0</dd>
+                        </div>
+                        <div>
+                            <dt>Median</dt>
+                            <dd id="medianScore">0</dd>
+                        </div>
+                        <div>
+                            <dt>Std Dev</dt>
+                            <dd id="stdDev">0</dd>
+                        </div>
+                        <div>
+                            <dt>Min</dt>
+                            <dd id="minScore">0</dd>
+                        </div>
+                        <div>
+                            <dt>Max</dt>
+                            <dd id="maxScore">0</dd>
+                        </div>
+                    </dl>
+                </section>
+
+                <section class="section">
+                    <h3>Performance</h3>
+                    <dl class="data-list">
+                        <div>
+                            <dt>/add</dt>
+                            <dd id="addPerf">0ms</dd>
+                        </div>
+                        <div>
+                            <dt>/remove</dt>
+                            <dd id="removePerf">0ms</dd>
+                        </div>
+                        <div>
+                            <dt>/leaderboard</dt>
+                            <dd id="leaderboardPerf">0ms</dd>
+                        </div>
+                        <div>
+                            <dt>/info</dt>
+                            <dd id="infoPerf">0ms</dd>
+                        </div>
+                    </dl>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <div id="statusMessage"></div>
+    <script src="script.js"></script>
 </body>
 </html>
