@@ -1,5 +1,6 @@
 use clap::Parser;
 use sqlx::postgres::PgPoolOptions;
+use uuid::Uuid;
 
 #[derive(Parser)]
 struct Args {
@@ -20,4 +21,11 @@ async fn main() {
         .run(&pool)
         .await
         .expect("There was an issue running migrations");
+
+    if args.setup {
+        todo!("requires toml config")
+    }
+
+    let secret = Uuid::new_v4();
+    println!("Admin Secret: {}", secret);
 }
