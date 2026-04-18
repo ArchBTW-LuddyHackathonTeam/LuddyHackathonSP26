@@ -50,11 +50,11 @@ impl Token {
     }
 
     pub async fn new(pool: &PgPool) -> Result<String, sqlx::Error> {
-        let new_token = Uuid::new_v4();
+        let new_token = Uuid::new_v4().to_string();
         let mut h = Sha256::new();
-        h.update(new_token);
+        h.update(&new_token);
         Token::create(&pool, hex::encode(h.finalize()))
             .await
-            .map(|_| new_token.to_string())
+            .map(|_| new_token)
     }
 }

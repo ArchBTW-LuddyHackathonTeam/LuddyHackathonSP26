@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use axum::{
     Json, Router,
     extract::{Path, Query, State},
@@ -5,6 +7,7 @@ use axum::{
     routing::{delete, get, post},
 };
 use serde::{Deserialize, Serialize};
+use tokio::sync::RwLock;
 
 use crate::{
     config::{Config, LeaderboardSortOrder},
@@ -15,7 +18,7 @@ use crate::{
 #[derive(Clone)]
 pub struct AppState {
     pub db: sqlx::PgPool,
-    pub config: Config,
+    pub config: Arc<RwLock<Config>>,
 }
 
 #[derive(Deserialize)]
@@ -91,13 +94,14 @@ struct BoardConfigResponse {
 }
 
 async fn board_name_handler(State(state): State<AppState>) -> Json<BoardNameResponse> {
+    let config = state.config.read().await;
     Json(BoardNameResponse {
-        title: state.config.leaderboard.title.clone(),
+        title: config.leaderboard.title.clone(),
     })
 }
 
 async fn board_config_handler(State(state): State<AppState>) -> Json<BoardConfigResponse> {
-    let config = state.config;
+    let config = state.config.read().await;
     Json(BoardConfigResponse {
         title: config.leaderboard.title.clone(),
         sort_order: config.leaderboard.sort_order,

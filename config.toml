@@ -2,5 +2,5 @@
 port = 3000
 
 [leaderboard]
-title = "Luddy Hackathon Spring 2026"
-sort_order = "descending"                    # "ascending" or "descending"
+title = "Updated Hackathon Title"
+sort_order = "descending"

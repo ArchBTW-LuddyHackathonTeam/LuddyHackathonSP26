@@ -41,7 +41,7 @@ async fn update_config_handler(
         return Err(StatusCode::UNAUTHORIZED);
     }
 
-    let mut config = state.config;
+    let mut config = state.config.write().await;
 
     if let Some(title) = req.title {
         config.leaderboard.title = title;
