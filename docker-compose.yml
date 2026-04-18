@@ -19,7 +19,7 @@ services:
     depends_on:
       - postgres
     volumes:
-      - ./Config.toml:/app/Config.toml
+      - ./config.toml:/app/config.toml
 
 volumes:
   postgres_data:

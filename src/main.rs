@@ -30,7 +30,7 @@ async fn main() {
 
     let config: Config;
 
-    match tokio::fs::read_to_string("Config.toml").await {
+    match tokio::fs::read_to_string("config.toml").await {
         Ok(raw_config) => {
             config = toml::from_str(raw_config.as_str())
                 .expect("There was an error parsing the config file")
