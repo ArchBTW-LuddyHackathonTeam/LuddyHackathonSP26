@@ -4,28 +4,31 @@ use axum::{
     routing::{delete, get, post},
     Json, Router,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 use crate::{
     config::Config,
     models::{score::Score, score_history::ScoreHistory},
+    routes,
 };
 
 #[derive(Clone)]
 pub struct AppState {
     pub db: sqlx::PgPool,
-    pub config: Config,
+    pub config: Arc<RwLock<Config>>,
 }
 
 #[derive(Deserialize)]
 pub struct AddRequest {
-    key: String, // max 32 chars
+    key: String,
     value: f64,
 }
 
 #[derive(Deserialize)]
 pub struct HistoryQuery {
-    key: Option<String>, // max 32 chars
+    key: Option<String>,
     start: Option<String>,
     end: Option<String>,
 }
@@ -34,19 +37,18 @@ async fn add_handler(
     State(state): State<AppState>,
     Json(req): Json<AddRequest>,
 ) -> Result<Json<Score>, StatusCode> {
-    let mut uploader: String = req.key;
+    let mut uploader = req.key;
     uploader.truncate(32);
-    let value: f64 = req.value;
 
     Score::delete_by_uploader(&state.db, &uploader)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let new_score: Score = Score::create(&state.db, &uploader, value)
+    let new_score = Score::create(&state.db, &uploader, req.value)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    ScoreHistory::create(&state.db, uploader, value)
+    ScoreHistory::create(&state.db, uploader, req.value)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -79,6 +81,32 @@ async fn history_handler(State(_state): State<AppState>, Query(_params): Query<H
     todo!()
 }
 
+#[derive(Serialize)]
+struct BoardNameResponse {
+    title: String,
+}
+
+#[derive(Serialize)]
+struct BoardConfigResponse {
+    title: String,
+    sort_order: String,
+}
+
+async fn board_name_handler(State(state): State<AppState>) -> Json<BoardNameResponse> {
+    let config = state.config.read().await;
+    Json(BoardNameResponse {
+        title: config.leaderboard.title.clone(),
+    })
+}
+
+async fn board_config_handler(State(state): State<AppState>) -> Json<BoardConfigResponse> {
+    let config = state.config.read().await;
+    Json(BoardConfigResponse {
+        title: config.leaderboard.title.clone(),
+        sort_order: config.leaderboard.sort_order.clone(),
+    })
+}
+
 pub fn app(state: AppState) -> Router {
     Router::new()
         .route("/health", get(|| async { "OK" }))
@@ -87,5 +115,8 @@ pub fn app(state: AppState) -> Router {
         .route("/performance", get(performance_handler))
         .route("/info", get(info_handler))
         .route("/history", get(history_handler))
+        .route("/boardname", get(board_name_handler))
+        .route("/boardconfig", get(board_config_handler))
+        .nest("/admin", routes::admin::router())
         .with_state(state)
 }

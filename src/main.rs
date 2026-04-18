@@ -1,4 +1,4 @@
-use std::io::ErrorKind;
+use std::{io::ErrorKind, sync::Arc};
 
 use clap::Parser;
 use luddy_hackathon_sp26::{
@@ -7,6 +7,7 @@ use luddy_hackathon_sp26::{
     router::{self, AppState},
 };
 use sqlx::postgres::PgPoolOptions;
+use tokio::sync::RwLock;
 
 #[derive(Parser)]
 struct Args {
@@ -77,16 +78,19 @@ async fn main() {
         );
     }
 
-    let state = AppState { db: pool, config };
-    let server_config = state.config.server;
+    let server_port = config.server.port;
+    let state = AppState {
+        db: pool,
+        config: Arc::new(RwLock::new(config)),
+    };
 
     let app = router::app(state);
 
-    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", server_config.port))
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", server_port))
         .await
         .expect("Couldn't create TCP listener");
 
-    println!("Listening on localhost:3000");
+    println!("Listening on localhost:{}", server_port);
     axum::serve(listener, app)
         .await
         .expect("There was an error serving the app")
