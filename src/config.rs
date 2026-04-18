@@ -9,7 +9,7 @@ pub struct Config {
 
 impl Config {
     pub async fn save(&self) -> Result<()> {
-        tokio::fs::write("config.toml", toml::to_string_pretty(&self)?).await?;
+        tokio::fs::write("Config.toml", toml::to_string_pretty(&self)?).await?;
         Ok(())
     }
 }

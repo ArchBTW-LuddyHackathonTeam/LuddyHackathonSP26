@@ -18,6 +18,8 @@ services:
       DATABASE_URL: postgresql://leaderboard:hackathon@postgres:5432/leaderboard
     depends_on:
       - postgres
+    volumes:
+      - ./Config.toml:/app/Config.toml
 
 volumes:
   postgres_data:
