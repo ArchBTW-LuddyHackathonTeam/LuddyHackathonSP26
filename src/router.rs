@@ -105,6 +105,20 @@ async fn add_handler(
     let mut uploader = req.key;
     uploader.truncate(32);
 
+    let existing_score = Score::from_uploader(&state.db, &uploader)
+        .await
+        .map_err(|e| {
+            eprintln!("{:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    // save existing to history before overwriting
+    if let Some(old_score) = existing_score {
+        ScoreHistory::create(&state.db, old_score.uploader.clone(), old_score.value)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    }
+
     let new_score = Score::create(&state.db, &uploader, req.value)
         .await
         .map_err(|e| {
@@ -112,6 +126,7 @@ async fn add_handler(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
+    // save the new score to history
     ScoreHistory::create(&state.db, uploader, req.value)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;

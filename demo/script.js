@@ -28,10 +28,10 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEvents();
     loadBoardConfig();
 
-    // High-frequency UI loop
-    setInterval(updateLoop, 250);
-    // History auto-refresh
-    setInterval(fetchHistory, 3000);
+    // UI polling freq
+    setInterval(updateLoop, 500);
+    // History freq
+    setInterval(fetchHistory, 500);
 });
 
 function initCharts() {
@@ -249,8 +249,16 @@ async function fetchHistory() {
     // Apply date range filter from dual slider
     const startDate = getDateFromSlider('rangeMin');
     const endDate = getDateFromSlider('rangeMax');
-    if (startDate) params.set('start', startDate.toISOString());
-    if (endDate) params.set('end', endDate.toISOString());
+    if (startDate) {
+        // padding
+        const paddedStart = new Date(startDate.getTime() - 1000);
+        params.set('start', paddedStart.toISOString());
+    }
+    if (endDate) {
+        // padding
+        const paddedEnd = new Date(endDate.getTime() + 1000);
+        params.set('end', paddedEnd.toISOString());
+    }
 
     try {
         const res = await fetch(`${API_BASE_URL}/history?${params}`);
