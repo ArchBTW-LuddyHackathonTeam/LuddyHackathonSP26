@@ -1,6 +1,10 @@
 use serde::Serialize;
 use sqlx::{prelude::FromRow, PgPool};
 
+use crate::config::LeaderboardSortOrder;
+
+const LEADERBOARD_SIZE: i32 = 10;
+
 #[derive(Debug, FromRow, Serialize)]
 pub struct Score {
     pub uploader: String,
@@ -45,5 +49,37 @@ impl Score {
             .execute(pool)
             .await
             .map(|r| r.rows_affected())
+    }
+
+    pub async fn leaderboard(
+        pool: &PgPool,
+        sort: LeaderboardSortOrder,
+    ) -> Result<Vec<Score>, sqlx::Error> {
+        Self::leaderboard_num(pool, LEADERBOARD_SIZE, sort).await
+    }
+
+    pub async fn leaderboard_num(
+        pool: &PgPool,
+        num: i32,
+        sort: LeaderboardSortOrder,
+    ) -> Result<Vec<Score>, sqlx::Error> {
+        match sort {
+            LeaderboardSortOrder::Ascending => {
+                sqlx::query_as(
+                    "SELECT uploader, value, created_at FROM score ORDER BY value ASC LIMIT $1",
+                )
+                .bind(num)
+                .fetch_all(pool)
+                .await
+            }
+            LeaderboardSortOrder::Descending => {
+                sqlx::query_as(
+                    "SELECT uploader, value, created_at FROM score ORDER BY value DESC LIMIT $1",
+                )
+                .bind(num)
+                .fetch_all(pool)
+                .await
+            }
+        }
     }
 }
