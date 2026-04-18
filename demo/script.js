@@ -300,9 +300,25 @@ function startLoadTest() {
     document.getElementById('stopStress').disabled = false;
     const intensity = parseInt(document.getElementById('stressIntensity').value);
 
+    // Calculate requests per second: 1-10 = slow (1-10 req/s), 11-50 = fast (20-200 req/s)
+    let requestsPerSecond;
+    let intervalMs;
+
+    if (intensity <= 10) {
+        // Slow mode: 1-10 concurrent users = 1-10 requests per second
+        requestsPerSecond = intensity;
+        intervalMs = 1000; // Run once per second
+    } else {
+        // Fast mode: 11-50 concurrent users = 20-200 requests per second
+        requestsPerSecond = (intensity - 10) * 5;
+        intervalMs = 100; // Run 10 times per second
+    }
+
     testInterval = setInterval(async () => {
         const batch = [];
-        for (let i = 0; i < Math.max(1, intensity / 5); i++) {
+        const batchSize = intervalMs === 1000 ? requestsPerSecond : Math.ceil(requestsPerSecond / 10);
+
+        for (let i = 0; i < batchSize; i++) {
             const user = SIMULATED_USERS[Math.floor(Math.random() * SIMULATED_USERS.length)];
             const val = parseFloat((Math.random() * 1000).toFixed(2));
             batch.push(fetch(`${API_BASE_URL}/add`, {
@@ -312,8 +328,12 @@ function startLoadTest() {
             }).then(() => requestCounter++).catch(() => { }));
         }
         await Promise.all(batch);
-        document.getElementById('stressStatus').textContent = `Simulating ~${intensity * 10} events/sec`;
-    }, 100);
+
+        const statusText = intensity <= 10
+            ? `Simulating ${requestsPerSecond} event${requestsPerSecond > 1 ? 's' : ''}/sec`
+            : `Simulating ~${requestsPerSecond} events/sec`;
+        document.getElementById('stressStatus').textContent = statusText;
+    }, intervalMs);
 }
 
 function stopLoadTest() {
