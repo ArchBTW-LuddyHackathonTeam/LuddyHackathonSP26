@@ -18,7 +18,11 @@ async fn main() {
     let args = Args::parse();
     let pool = PgPoolOptions::new()
         .max_connections(5)
-        .connect(std::env::var("DATABASE_URL").unwrap().as_str())
+        .connect(
+            std::env::var("DATABASE_URL")
+                .expect("The database url environment variable does not exist")
+                .as_str(),
+        )
         .await
         .expect("There was an issue connecting to the database");
     sqlx::migrate!()
