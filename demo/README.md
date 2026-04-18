@@ -6,10 +6,10 @@ Usage:
 
 ```bash
 # Defaults: 20 workers, 20 seconds
-go run stress_test.go -base http://localhost:3000
+go run stress.go -base http://localhost:3000
 
 # Heavy usage
-go run stress_test.go -base http://localhost:3000 -concurrency 100 -duration 60s
+go run stress.go -base http://localhost:3000 -concurrency 100 -duration 60s
 
 # Compile first for max speed
 go build -o stress stress.go
