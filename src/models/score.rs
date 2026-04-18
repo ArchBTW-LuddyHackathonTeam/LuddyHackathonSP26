@@ -71,12 +71,21 @@ impl Score {
     /// Insert a new score and return the created record
     pub async fn create(pool: &PgPool, uploader: &String, value: f64) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"INSERT INTO score (uploader, value, created_at)
-            VALUES ($1, $2, NOW())
-            ON CONFLICT (uploader) DO UPDATE
-              SET value = EXCLUDED.value,
-                  created_at = EXCLUDED.created_at
-            RETURNING *"#,
+            r#"
+            WITH upsert AS (
+                INSERT INTO score (uploader, value, created_at)
+                VALUES ($1, $2, NOW())
+                ON CONFLICT (uploader) DO UPDATE
+                  SET value = EXCLUDED.value,
+                      created_at = EXCLUDED.created_at
+                RETURNING *
+            ),
+            hist AS (
+                INSERT INTO score_history (uploader, value)
+                VALUES ($1, $2)
+            )
+            SELECT uploader, created_at, value FROM upsert
+            "#,
         )
         .bind(uploader)
         .bind(value)

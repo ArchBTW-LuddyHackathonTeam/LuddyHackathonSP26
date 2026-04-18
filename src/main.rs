@@ -20,7 +20,7 @@ struct Args {
 async fn main() {
     let args = Args::parse();
     let pool = PgPoolOptions::new()
-        .max_connections(5)
+        .max_connections(100)
         .connect(
             std::env::var("DATABASE_URL")
                 .expect("The database url environment variable does not exist")
