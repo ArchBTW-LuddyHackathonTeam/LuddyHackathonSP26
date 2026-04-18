@@ -1,4 +1,6 @@
+use sha2::{Digest, Sha256};
 use sqlx::{PgPool, prelude::FromRow};
+use uuid::Uuid;
 
 #[derive(Debug, FromRow)]
 pub struct Token {
@@ -46,5 +48,13 @@ impl Token {
             .await
             .map(|r| r.rows_affected())
     }
-}
 
+    pub async fn new(pool: &PgPool) -> Result<String, sqlx::Error> {
+        let new_token = Uuid::new_v4();
+        let mut h = Sha256::new();
+        h.update(new_token);
+        Token::create(&pool, hex::encode(h.finalize()))
+            .await
+            .map(|_| new_token.to_string())
+    }
+}
