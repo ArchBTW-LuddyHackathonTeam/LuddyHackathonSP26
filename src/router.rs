@@ -83,21 +83,9 @@ async fn history_handler(State(_state): State<AppState>, Query(_params): Query<H
 }
 
 #[derive(Serialize)]
-struct BoardNameResponse {
-    title: String,
-}
-
-#[derive(Serialize)]
 struct BoardConfigResponse {
     title: String,
     sort_order: LeaderboardSortOrder,
-}
-
-async fn board_name_handler(State(state): State<AppState>) -> Json<BoardNameResponse> {
-    let config = state.config.read().await;
-    Json(BoardNameResponse {
-        title: config.leaderboard.title.clone(),
-    })
 }
 
 async fn board_config_handler(State(state): State<AppState>) -> Json<BoardConfigResponse> {
@@ -116,7 +104,6 @@ pub fn app(state: AppState) -> Router {
         .route("/performance", get(performance_handler))
         .route("/info", get(info_handler))
         .route("/history", get(history_handler))
-        .route("/boardname", get(board_name_handler))
         .route("/boardconfig", get(board_config_handler))
         .nest("/admin", routes::admin::router())
         .with_state(state)
