@@ -36,6 +36,7 @@ var (
 	concurrency = flag.Int("concurrency", 20, "Number of concurrent workers")
 	duration    = flag.Duration("duration", 20*time.Second, "Test duration")
 	rampup      = flag.Duration("rampup", 2*time.Second, "Ramp-up period")
+	users       = flag.Int("users", 2000, "Size of the simulated user pool")
 )
 
 // ── Result types ─────────────────────────────────────────────────────────────
@@ -58,12 +59,34 @@ type Endpoint struct {
 	Weight int // relative frequency
 }
 
-var participants = []string{
-	"alice", "bob", "charlie", "diana", "eve",
-	"frank", "grace", "heidi", "ivan", "judy",
-	"mallory", "niaj", "olivia", "peggy", "rupert",
-	"sybil", "trent", "victor", "wendy", "zara",
+func generateParticipants(n int) []string {
+	first := []string{
+		"alice", "bob", "charlie", "diana", "eve", "frank", "grace", "heidi",
+		"ivan", "judy", "mallory", "niaj", "olivia", "peggy", "rupert", "sybil",
+		"trent", "victor", "wendy", "zara", "aaron", "bella", "carlos", "demi",
+	}
+	last := []string{
+		"smith", "jones", "patel", "chen", "kim", "garcia", "müller", "okafor",
+		"tanaka", "silva", "brown", "white", "lee", "wang", "martin", "thompson",
+	}
+	seen := map[string]bool{}
+	var out []string
+	r := rand.New(rand.NewSource(42))
+	for len(out) < n {
+		name := fmt.Sprintf("%s_%s_%04d",
+			first[r.Intn(len(first))],
+			last[r.Intn(len(last))],
+			r.Intn(n*10),
+		)
+		if !seen[name] {
+			seen[name] = true
+			out = append(out, name)
+		}
+	}
+	return out
 }
+
+var participants []string
 
 func randomParticipant() string {
 	return participants[rand.Intn(len(participants))]
@@ -264,6 +287,8 @@ func main() {
 
 	eps := endpoints()
 	table := buildWeightTable(eps)
+
+	participants = generateParticipants(*users)
 
 	client := &http.Client{
 		Timeout: 10 * time.Second,
