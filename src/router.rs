@@ -1,8 +1,10 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Path, Query, Request, State},
     http::StatusCode,
+    middleware::Next,
+    response::Response,
     routing::{delete, get, post},
     Json, Router,
 };
@@ -21,10 +23,17 @@ use crate::{
     routes,
 };
 
+#[derive(Clone, Default)]
+pub struct EndpointMetrics {
+    pub count: u64,
+    pub total_ms: f64,
+}
+
 #[derive(Clone)]
 pub struct AppState {
     pub db: sqlx::PgPool,
     pub config: Arc<RwLock<Config>>,
+    pub metrics: Arc<RwLock<HashMap<String, EndpointMetrics>>>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -95,8 +104,29 @@ async fn remove_handler(State(state): State<AppState>, Path(uploader): Path<Stri
     }
 }
 
-async fn performance_handler(State(_state): State<AppState>) {
-    todo!()
+#[derive(Serialize)]
+struct PerformanceEntry {
+    endpoint: String,
+    avg_ms: f64,
+    count: u64,
+}
+
+async fn performance_handler(State(state): State<AppState>) -> Json<Vec<PerformanceEntry>> {
+    let metrics = state.metrics.read().await;
+    let mut entries: Vec<PerformanceEntry> = metrics
+        .iter()
+        .map(|(path, m)| PerformanceEntry {
+            endpoint: path.clone(),
+            avg_ms: if m.count > 0 {
+                m.total_ms / m.count as f64
+            } else {
+                0.0
+            },
+            count: m.count,
+        })
+        .collect();
+    entries.sort_by(|a, b| a.endpoint.cmp(&b.endpoint));
+    Json(entries)
 }
 
 async fn info_handler(State(state): State<AppState>) -> Result<Json<ScoreStats>, StatusCode> {
@@ -135,6 +165,37 @@ async fn board_config_handler(State(state): State<AppState>) -> Json<BoardConfig
 )]
 pub struct ApiDoc;
 
+async fn metrics_middleware(
+    State(state): State<AppState>,
+    request: Request,
+    next: Next,
+) -> Response {
+    let path = request.uri().path().to_string();
+
+    let start = std::time::Instant::now();
+    let response = next.run(request).await;
+    let elapsed = start.elapsed().as_secs_f64() * 1000.0;
+
+    if path != "/performance" {
+        let normalized = if path.starts_with("/remove/") {
+            "/remove".to_string()
+        } else if path.starts_with("/leaderboard/json/") {
+            "/leaderboard/json".to_string()
+        } else if path.starts_with("/leaderboard/") && path != "/leaderboard/" {
+            "/leaderboard".to_string()
+        } else {
+            path
+        };
+
+        let mut metrics = state.metrics.write().await;
+        let entry = metrics.entry(normalized).or_default();
+        entry.count += 1;
+        entry.total_ms += elapsed;
+    }
+
+    response
+}
+
 pub fn app(state: AppState) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(Any)
@@ -152,6 +213,10 @@ pub fn app(state: AppState) -> Router {
         .nest("/admin", routes::admin::router(state.clone()))
         .nest("/leaderboard", routes::leaderboard::router())
         .layer(cors)
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            metrics_middleware,
+        ))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .with_state(state)
 }
