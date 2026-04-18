@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use axum::{
-    Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
     routing::{delete, get, post},
+    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
@@ -14,7 +14,10 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
     config::{Config, LeaderboardSortOrder},
-    models::{score::Score, score_history::ScoreHistory},
+    models::{
+        score::{Score, ScoreStats},
+        score_history::ScoreHistory,
+    },
     routes,
 };
 
@@ -96,8 +99,12 @@ async fn performance_handler(State(_state): State<AppState>) {
     todo!()
 }
 
-async fn info_handler(State(_state): State<AppState>) {
-    todo!()
+async fn info_handler(State(state): State<AppState>) -> Result<Json<ScoreStats>, StatusCode> {
+    Ok(Json(
+        Score::get_score_stats(&state.db)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+    ))
 }
 
 async fn history_handler(State(_state): State<AppState>, Query(_params): Query<HistoryQuery>) {
@@ -145,9 +152,6 @@ pub fn app(state: AppState) -> Router {
         .nest("/admin", routes::admin::router(state.clone()))
         .nest("/leaderboard", routes::leaderboard::router())
         .layer(cors)
-        .merge(
-            SwaggerUi::new("/swagger-ui")
-                .url("/api-docs/openapi.json", ApiDoc::openapi())
-        )
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .with_state(state)
 }

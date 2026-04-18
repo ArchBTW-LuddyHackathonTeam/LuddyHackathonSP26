@@ -16,6 +16,23 @@ pub struct Score {
     pub value: f64,
 }
 
+#[derive(Debug, FromRow, Serialize)]
+pub struct ScoreStats {
+    pub count: Option<i64>,
+    pub mean: Option<f64>,
+    pub median: Option<f64>,
+    pub min: Option<f64>,
+    pub max: Option<f64>,
+    pub range: Option<f64>,
+    pub stddev: Option<f64>,
+    pub stddev_pop: Option<f64>,
+    pub variance: Option<f64>,
+    pub p25: Option<f64>,
+    pub p75: Option<f64>,
+    pub iqr: Option<f64>,
+    pub mode: Option<f64>,
+}
+
 impl Score {
     /// Fetch a single score by its uploader
     pub async fn from_uploader(
@@ -85,5 +102,30 @@ impl Score {
                 .await
             }
         }
+    }
+
+    pub async fn get_score_stats(pool: &sqlx::PgPool) -> Result<ScoreStats, sqlx::Error> {
+        sqlx::query_as(
+            r#"
+        SELECT
+            COUNT(value)                                                AS "count",
+            AVG(value)                                                  AS "mean",
+            PERCENTILE_CONT(0.5)  WITHIN GROUP (ORDER BY value)        AS "median",
+            MIN(value)                                                  AS "min",
+            MAX(value)                                                  AS "max",
+            MAX(value) - MIN(value)                                     AS "range",
+            STDDEV(value)                                               AS "stddev",
+            STDDEV_POP(value)                                           AS "stddev_pop",
+            VARIANCE(value)                                             AS "variance",
+            PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY value)        AS "p25",
+            PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY value)        AS "p75",
+            PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY value)
+                - PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY value)  AS "iqr",
+            MODE()                WITHIN GROUP (ORDER BY value)        AS "mode"
+        FROM score
+        "#,
+        )
+        .fetch_one(pool)
+        .await
     }
 }
