@@ -81,7 +81,7 @@ async fn main() {
     let server_port = config.server.port;
     let state = AppState {
         db: pool,
-        config: Arc::new(RwLock::new(config)),
+        config: config,
     };
 
     let app = router::app(state);

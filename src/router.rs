@@ -5,8 +5,6 @@ use axum::{
     routing::{delete, get, post},
 };
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use tokio::sync::RwLock;
 
 use crate::{
     config::Config,
@@ -17,7 +15,7 @@ use crate::{
 #[derive(Clone)]
 pub struct AppState {
     pub db: sqlx::PgPool,
-    pub config: Arc<RwLock<Config>>,
+    pub config: Config,
 }
 
 #[derive(Deserialize)]
@@ -93,17 +91,16 @@ struct BoardConfigResponse {
 }
 
 async fn board_name_handler(State(state): State<AppState>) -> Json<BoardNameResponse> {
-    let config = state.config.read().await;
     Json(BoardNameResponse {
-        title: config.leaderboard.title.clone(),
+        title: state.config.leaderboard.title.clone(),
     })
 }
 
 async fn board_config_handler(State(state): State<AppState>) -> Json<BoardConfigResponse> {
-    let config = state.config.read().await;
+    let config = state.config;
     Json(BoardConfigResponse {
         title: config.leaderboard.title.clone(),
-        sort_order: config.leaderboard.sort_order.clone(),
+        sort_order: config.leaderboard.sort_order,
     })
 }
 
