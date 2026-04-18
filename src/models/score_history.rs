@@ -12,7 +12,7 @@ pub struct ScoreHistory {
 impl ScoreHistory {
     /// Fetch a single score history entry by its id
     pub async fn from_id(pool: &PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
-        sqlx::query_as("SELECT id, uploader, created_at, value FROM score_history WHERE id == $1")
+        sqlx::query_as("SELECT id, uploader, created_at, value FROM score_history WHERE id = $1")
             .bind(id)
             .fetch_optional(pool)
             .await
@@ -22,7 +22,7 @@ impl ScoreHistory {
     /// Fetch all score histories by an uploader
     pub async fn by_uploader(pool: &PgPool, uploader: String) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            "SELECT id, uploader, created_at, value, FROM score_history where uploader == $1",
+            "SELECT id, uploader, created_at, value, FROM score_history where uploader = $1",
         )
         .bind(uploader)
         .fetch_all(pool)

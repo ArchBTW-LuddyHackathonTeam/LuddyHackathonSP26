@@ -13,7 +13,7 @@ impl Score {
         pool: &PgPool,
         uploader: String,
     ) -> Result<Option<Self>, sqlx::Error> {
-        sqlx::query_as("SELECT uploader, created_at, value FROM score WHERE uploader == $1")
+        sqlx::query_as("SELECT uploader, created_at, value FROM score WHERE uploader = $1")
             .bind(uploader)
             .fetch_optional(pool)
             .await
@@ -30,7 +30,7 @@ impl Score {
 
     /// Delete this score. Returns the number of rows affected.
     pub async fn delete(&self, pool: &PgPool) -> Result<u64, sqlx::Error> {
-        sqlx::query("DELETE FROM score WHERE uploader == $1")
+        sqlx::query("DELETE FROM score WHERE uploader = $1")
             .bind(&self.uploader)
             .execute(pool)
             .await
@@ -39,7 +39,7 @@ impl Score {
 
     /// Directly delete a record by its uploader. Returns the number of rows affected.
     pub async fn delete_by_uploader(pool: &PgPool, uploader: String) -> Result<u64, sqlx::Error> {
-        sqlx::query("DELETE FROM score WHERE uploader == $1")
+        sqlx::query("DELETE FROM score WHERE uploader = $1")
             .bind(uploader)
             .execute(pool)
             .await
