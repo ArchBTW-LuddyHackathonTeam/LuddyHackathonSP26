@@ -9,11 +9,23 @@
 ![Swagger](https://img.shields.io/badge/Docs-Swagger_UI-85ea2d?style=flat&logo=swagger&logoColor=black)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat)
 
-A blazingly fast and self-hostable leaderboard API built for competitive events. Submit scores, track rankings, and analyze performance, all through a REST API and live web dashboard.
+A blazingly fast, self-hostable leaderboard API for real-time ranking, benchmarking, and performance tracking. Submit scores, track standings, and analyze results through a REST API and live web dashboard.
 
+## Dashboard & Performance
+
+![Web Interface](assets/web_interface.png)
+*Real-time leaderboard dashboard*
+
+| Stress Test Summary | Detailed Results |
+|--------------------|-----------------|
+| ![Stress Test Summary](assets/stress_test_report_summary.png) | ![Detailed Stress Test Results](assets/stress_test_report_detailed.png) |
+
+*Stress testing results*
 
 ## About
-LibreBoard is a an open-source leaderboard platform built for easy self-hosting. With LibreBoard, our goal is to offer a fast, lightweight, flexible, and easy-to-run leaderboard that gives developers full control without unnecessary friction.
+LibreBoard is an open-source leaderboard platform designed for straightforward self-hosting. With this project, our goal is to offer developers full control over a fast, lightweight, flexible, and user-friendly leaderboard with no unnecessary friction.
+
+The high-efficiency design of LibreBoard is intended to make it useful for a wide range of ranking and performance-tracking scenarios, including traditional competitive events. These include coding competitions, gaming tournaments, classroom challenges, internal benchmarking and algorithm or model evaluation workflows, where fast live updates and performance computations can be necessary.
 
 ### Tech Stack
 - **Backend:** Rust + Axum
@@ -72,6 +84,10 @@ curl -X PATCH http://localhost:3000/admin/config \
   -H "Content-Type: application/json" \
   -d '{"title": "My Leaderboard", "sort_order": "descending"}'
 ```
+
+You can also input the admin secret through the web interface by navigating to Admin Settings > Administrator Login in the top-right corner of the dashboard.
+
+As of right now, the admin endpoint only supports changing the leaderboard title and ranking sort order. However, this functionality can be expanded for additional security and operational purposes, such as protecting sensitive configuration changes and managing deployment-specific settings through authenticated access.
 
 
 ## API Endpoints
