@@ -1,5 +1,4 @@
 use sqlx::{prelude::FromRow, PgPool};
-use uuid::Uuid;
 
 #[derive(Debug, FromRow)]
 pub struct Score {
@@ -9,7 +8,7 @@ pub struct Score {
 }
 
 impl Score {
-    /// Fetch a single score by its name
+    /// Fetch a single score by its uploader
     pub async fn from_uploader(
         pool: &PgPool,
         uploader: String,
@@ -31,15 +30,19 @@ impl Score {
 
     /// Delete this score. Returns the number of rows affected.
     pub async fn delete(&self, pool: &PgPool) -> Result<u64, sqlx::Error> {
-        sqlx::query("DELETE FROM score WHERE name == $1")
+        sqlx::query("DELETE FROM score WHERE uploader == $1")
             .bind(&self.uploader)
             .execute(pool)
             .await
             .map(|r| r.rows_affected())
     }
 
-    /// Directly delete a record by its id. Returns the number of rows affected.
-    pub async fn delete_by_id(pool: &PgPool, id: Uuid) -> Result<u64, sqlx::Error> {
-        todo!()
+    /// Directly delete a record by its uploader. Returns the number of rows affected.
+    pub async fn delete_by_uploader(pool: &PgPool, uploader: String) -> Result<u64, sqlx::Error> {
+        sqlx::query("DELETE FROM score WHERE uploader == $1")
+            .bind(uploader)
+            .execute(pool)
+            .await
+            .map(|r| r.rows_affected())
     }
 }
