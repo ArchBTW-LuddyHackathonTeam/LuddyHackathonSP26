@@ -1,0 +1,637 @@
+openapi: 3.1.0
+info:
+  title: Luddy Hackathon SP26 API
+  description: >-
+    REST API for the Luddy Hackathon SP26 leaderboard service.
+
+    Participants submit scores via `/add` and the server maintains a live ranked
+    leaderboard.  Administrative operations (e.g. updating the board title or
+    sort order) require a Bearer token in the `Authorization` header.
+  license:
+    name: ""
+  version: 1.0.0
+paths:
+  /add:
+    post:
+      tags:
+        - scores
+      summary: Submit or replace a participant's score.
+      description: >-
+        If the participant (`key`) already has a score on the leaderboard it is
+
+        deleted before the new one is inserted, so each participant always has
+        at
+
+        most one active score.  The old value is still preserved in the score
+
+        history.  The key is silently truncated to 32 characters.
+      operationId: add_handler
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddRequest"
+        required: true
+      responses:
+        "200":
+          description: Score accepted and recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Score"
+        "500":
+          description: Database error
+  /admin/config:
+    patch:
+      tags:
+        - admin
+      summary: Update the leaderboard configuration.
+      description: |-
+        Partially updates the leaderboard configuration.  Supply only the fields
+        you want to change.  Changes are persisted to `config.toml` immediately.
+
+        Requires a valid admin Bearer token in the `Authorization` header.
+      operationId: update_config_handler
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateConfigRequest"
+        required: true
+      responses:
+        "200":
+          description: Configuration updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Config"
+        "400":
+          description: Invalid sort_order value supplied
+        "401":
+          description: Missing or invalid Authorization header
+        "500":
+          description: Database or filesystem error
+      security:
+        - bearer_auth: []
+  /boardconfig:
+    get:
+      tags:
+        - config
+      summary: Get the current leaderboard display configuration.
+      description: >-
+        Returns the leaderboard title and sort order as configured in
+        `config.toml`
+
+        (or updated via `PATCH /admin/config`).
+      operationId: board_config_handler
+      responses:
+        "200":
+          description: Current board configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BoardConfigResponse"
+  /health:
+    get:
+      tags:
+        - health
+      summary: Check whether the service is up and running.
+      operationId: health_handler
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /history:
+    get:
+      tags:
+        - scores
+      summary: Retrieve paginated score submission history across all participants.
+      description: |-
+        Returns historical score submissions in reverse-chronological order
+        (most recent first), optionally filtered by a datetime range.
+        Results are paginated; use the `count` and `page` parameters to page
+        through large result sets.
+      operationId: get_history
+      parameters:
+        - name: count
+          in: query
+          description: Number of items to display per page
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: page
+          in: query
+          description: Page number of results
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: start
+          in: query
+          description: Start timestamp of range
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          description: End timestamp of range
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Paginated list of score history entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScoreHistory"
+        "500":
+          description: Database error
+  /history/{user}:
+    get:
+      tags:
+        - scores
+      summary: Retrieve paginated score submission history for a single participant.
+      description: |-
+        Returns all historical score submissions for the given `user` in
+        reverse-chronological order (most recent first), optionally filtered
+        by a datetime range.  Results are paginated; use the `count` and
+        `page` parameters to page through large result sets.
+      operationId: user_history
+      parameters:
+        - name: user
+          in: path
+          description: Participant identifier to filter history by
+          required: true
+          schema:
+            type: string
+        - name: count
+          in: query
+          description: Number of items to display per page
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: page
+          in: query
+          description: Page number of results
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: start
+          in: query
+          description: Start timestamp of range
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          description: End timestamp of range
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Paginated list of score history entries for the given participant
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScoreHistory"
+        "500":
+          description: Database error
+  /info:
+    get:
+      tags:
+        - scores
+      summary: Get aggregate statistics for all scores currently on the leaderboard.
+      description: >-
+        Returns descriptive statistics including mean, median, standard
+        deviation,
+
+        percentiles, and more.
+      operationId: info_handler
+      responses:
+        "200":
+          description: Score statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScoreStats"
+        "500":
+          description: Database error
+  /leaderboard:
+    get:
+      tags:
+        - leaderboard
+      summary: Get the top-10 leaderboard as a Markdown table.
+      description: |-
+        Returns a human-readable Markdown-formatted table of the top 10 scores,
+        sorted according to the configured sort order.
+      operationId: get_leaderboard
+      responses:
+        "200":
+          description: Markdown table of the top-10 scores
+          content:
+            text/plain: {}
+        "500":
+          description: Database error
+  /leaderboard/json:
+    get:
+      tags:
+        - leaderboard
+      summary: Get the top-10 leaderboard as JSON.
+      description: |-
+        Returns the top 10 scores as a JSON array, sorted according to the
+        configured sort order.
+      operationId: get_leaderboard_json
+      responses:
+        "200":
+          description: JSON array of top-10 scores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Score"
+        "500":
+          description: Database error
+  /leaderboard/json/{num}:
+    get:
+      tags:
+        - leaderboard
+      summary: Get the top-N leaderboard as JSON.
+      description: |-
+        Returns the top `num` scores as a JSON array, sorted according to the
+        configured sort order.
+      operationId: get_leaderboard_json_num
+      parameters:
+        - name: num
+          in: path
+          description: Maximum number of leaderboard entries to return
+          required: true
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: JSON array of top-N scores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Score"
+        "500":
+          description: Database error
+  /leaderboard/{num}:
+    get:
+      tags:
+        - leaderboard
+      summary: Get the top-N leaderboard as a Markdown table.
+      description: >-
+        Returns a human-readable Markdown-formatted table of the top `num`
+        scores,
+
+        sorted according to the configured sort order.
+      operationId: get_leaderboard_num
+      parameters:
+        - name: num
+          in: path
+          description: Maximum number of leaderboard entries to return
+          required: true
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: Markdown table of the top-N scores
+          content:
+            text/plain: {}
+        "500":
+          description: Database error
+  /performance:
+    get:
+      tags:
+        - metrics
+      summary: Retrieve per-endpoint latency and request-count metrics.
+      description: >-
+        Returns an alphabetically sorted list of all endpoints that have
+        received
+
+        at least one request since the server started.  The `/performance`
+        endpoint
+
+        itself is excluded from tracking.
+      operationId: performance_handler
+      responses:
+        "200":
+          description: Endpoint performance metrics
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PerformanceEntry"
+  /remove/{uploader}:
+    delete:
+      tags:
+        - scores
+      summary: Remove a participant's score from the leaderboard.
+      description: |-
+        Deletes the active score for the given `uploader`.  The score history is
+        **not** affected.  The uploader value is silently truncated to 32
+        characters.
+      operationId: remove_handler
+      parameters:
+        - name: uploader
+          in: path
+          description: Participant identifier (max 32 characters)
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Score deleted successfully
+        "404":
+          description: No score found for the given uploader
+        "500":
+          description: Database error
+components:
+  schemas:
+    AddRequest:
+      type: object
+      description: Request body for submitting or updating a score.
+      required:
+        - key
+        - value
+      properties:
+        key:
+          type: string
+          description: The participant's unique identifier (max 32 characters).
+        value:
+          type: number
+          format: double
+          description: The score value to record.
+    BoardConfigResponse:
+      type: object
+      description: Response body describing the current leaderboard configuration.
+      required:
+        - title
+        - sort_order
+      properties:
+        sort_order:
+          $ref: "#/components/schemas/LeaderboardSortOrder"
+          description: Whether scores are ranked from highest-to-lowest or
+            lowest-to-highest.
+        title:
+          type: string
+          description: Human-readable title of the leaderboard.
+    Config:
+      type: object
+      description: Top-level application configuration (mirrors `config.toml`).
+      required:
+        - server
+        - leaderboard
+      properties:
+        leaderboard:
+          $ref: "#/components/schemas/LeaderboardConfig"
+        server:
+          $ref: "#/components/schemas/ServerConfig"
+    HealthResponse:
+      type: object
+      description: Response body for the health check endpoint.
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          description: Always `"OK"` when the service is healthy.
+    LeaderboardConfig:
+      type: object
+      required:
+        - title
+        - sort_order
+      properties:
+        sort_order:
+          $ref: "#/components/schemas/LeaderboardSortOrder"
+          description: Whether scores are sorted ascending or descending.
+        title:
+          type: string
+          description: Human-readable title displayed above the leaderboard.
+    LeaderboardSortOrder:
+      type: string
+      description: Controls the direction in which leaderboard scores are ranked.
+      enum:
+        - descending
+        - ascending
+    PerformanceEntry:
+      type: object
+      description: A single entry in the per-endpoint performance report.
+      required:
+        - endpoint
+        - avg_ms
+        - count
+      properties:
+        avg_ms:
+          type: number
+          format: double
+          description: Average latency in milliseconds across all recorded requests.
+        count:
+          type: integer
+          format: int64
+          description: Total number of requests recorded for this endpoint.
+          minimum: 0
+        endpoint:
+          type: string
+          description: The normalized endpoint path (e.g. `/add`, `/remove`,
+            `/leaderboard/json`).
+    Score:
+      type: object
+      description: A participant's current leaderboard entry.
+      required:
+        - uploader
+        - created_at
+        - value
+      properties:
+        created_at:
+          type: string
+          format: date-time
+          description: Timestamp when this score was first recorded (UTC).
+        uploader:
+          type: string
+          description: The participant's unique identifier.
+        value:
+          type: number
+          format: double
+          description: The numeric score value.
+    ScoreHistory:
+      type: object
+      required:
+        - id
+        - uploader
+        - created_at
+        - value
+      properties:
+        created_at:
+          type: string
+          format: date-time
+          description: Timestamp when this score was submitted (UTC).
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for this history entry.
+        uploader:
+          type: string
+          description: The participant's identifier.
+        value:
+          type: number
+          format: double
+          description: The score value that was submitted.
+    ScoreStats:
+      type: object
+      description: Descriptive statistics computed across all current leaderboard scores.
+      properties:
+        count:
+          type:
+            - integer
+            - "null"
+          format: int64
+          description: Total number of scores on the leaderboard.
+        earliest_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+          description: Timestamp of the earliest score entry.
+        iqr:
+          type:
+            - number
+            - "null"
+          format: double
+          description: Interquartile range (p75 − p25).
+        latest_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+          description: Timestamp of the latest score entry.
+        max:
+          type:
+            - number
+            - "null"
+          format: double
+          description: Highest score.
+        mean:
+          type:
+            - number
+            - "null"
+          format: double
+          description: Arithmetic mean of all scores.
+        median:
+          type:
+            - number
+            - "null"
+          format: double
+          description: Median (50th percentile) score.
+        min:
+          type:
+            - number
+            - "null"
+          format: double
+          description: Lowest score.
+        mode:
+          type:
+            - number
+            - "null"
+          format: double
+          description: Most frequently occurring score value.
+        p25:
+          type:
+            - number
+            - "null"
+          format: double
+          description: 25th percentile score.
+        p75:
+          type:
+            - number
+            - "null"
+          format: double
+          description: 75th percentile score.
+        range:
+          type:
+            - number
+            - "null"
+          format: double
+          description: Difference between the highest and lowest score.
+        stddev:
+          type:
+            - number
+            - "null"
+          format: double
+          description: Sample standard deviation.
+        stddev_pop:
+          type:
+            - number
+            - "null"
+          format: double
+          description: Population standard deviation.
+        variance:
+          type:
+            - number
+            - "null"
+          format: double
+          description: Sample variance.
+    ServerConfig:
+      type: object
+      required:
+        - port
+      properties:
+        port:
+          type: integer
+          format: int32
+          description: TCP port the HTTP server listens on.
+          minimum: 0
+    UpdateConfigRequest:
+      type: object
+      description: |-
+        Request body for updating the leaderboard configuration.
+
+        All fields are optional — only the supplied fields will be updated.
+      properties:
+        sort_order:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/LeaderboardSortOrder"
+              description: New sort order (`"ascending"` or `"descending"`).
+        title:
+          type:
+            - string
+            - "null"
+          description: New human-readable title for the leaderboard.
+tags:
+  - name: health
+    description: Service liveness checks
+  - name: scores
+    description: Score submission, removal, and statistics
+  - name: leaderboard
+    description: Ranked leaderboard views (plain-text and JSON)
+  - name: admin
+    description: Protected administrative operations (Bearer token required)
+  - name: config
+    description: Read the current leaderboard configuration
+  - name: metrics
+    description: Internal request-latency metrics
+
