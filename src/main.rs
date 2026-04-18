@@ -1,5 +1,8 @@
 use clap::Parser;
-use luddy_hackathon_sp26::router::{self, AppState};
+use luddy_hackathon_sp26::{
+    config::Config,
+    router::{self, AppState},
+};
 use sqlx::postgres::PgPoolOptions;
 use uuid::Uuid;
 
@@ -23,14 +26,27 @@ async fn main() {
         .await
         .expect("There was an issue running migrations");
 
+    let config: Config;
+
     if args.setup {
-        todo!("requires toml config")
+        config = Config {
+            secret: Uuid::new_v4(),
+        };
+        config
+            .save()
+            .await
+            .expect("There was an issue saving the newly created config");
+        println!("{}", toml::to_string_pretty(&config).unwrap());
+    } else {
+        let raw_config = tokio::fs::read_to_string("config.toml")
+            .await
+            .expect("There was an error loading the config.toml file");
+        config = toml::from_str(raw_config.as_str()).expect("There was an error parsing the config file, you can use the --setup flag to create a new one");
     }
 
-    let secret = Uuid::new_v4();
-    println!("Admin Secret: {}", secret);
+    println!("Admin Secret: {}", config.secret);
 
-    let state = AppState { db: pool, secret };
+    let state = AppState { db: pool, config };
 
     let app = router::app(state);
 
