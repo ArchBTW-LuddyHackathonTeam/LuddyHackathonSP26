@@ -60,6 +60,12 @@ pub struct ScoreStats {
     pub iqr: Option<f64>,
     /// Most frequently occurring score value.
     pub mode: Option<f64>,
+    /// Timestamp of the earliest score entry.
+    #[schema(schema_with = datetime_schema)]
+    pub earliest_at: Option<time::PrimitiveDateTime>,
+    /// Timestamp of the latest score entry.
+    #[schema(schema_with = datetime_schema)]
+    pub latest_at: Option<time::PrimitiveDateTime>,
 }
 
 impl Score {
@@ -157,7 +163,9 @@ impl Score {
             PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY value)        AS "p75",
             PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY value)
                 - PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY value)  AS "iqr",
-            MODE()                WITHIN GROUP (ORDER BY value)        AS "mode"
+            MODE()                WITHIN GROUP (ORDER BY value)        AS "mode",
+            MIN(created_at)                                                 AS "earliest_at",
+            MAX(created_at)                                                 AS "latest_at"
         FROM score
         "#,
         )

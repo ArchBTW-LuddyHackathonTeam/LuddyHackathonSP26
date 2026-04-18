@@ -3,168 +3,210 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leaderboard System</title>
+    <title>LibreBoard - Systems Analytics Dashboard</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>LibreBoard</h1>
-            <button id="toggleViewBtn" class="toggle-view-btn">Admin Mode</button>
+            <div class="brand">
+                <h1>LibreBoard <span class="version">v6.7.0-PRO</span></h1>
+                <span class="badge">Blazingly Fast</span>
+            </div>
+            <div class="header-actions">
+                <button id="toggleViewBtn">ADMIN_LOGIN</button>
+            </div>
         </header>
 
         <main id="regularView">
-            <div class="top-grid">
-                <section class="leaderboard-section">
-                    <h2>Top 10</h2>
-                    <div id="leaderboard"></div>
-                </section>
-
-                <div class="actions-grid">
-                    <section class="section">
-                        <h3>Add Entry</h3>
-                        <form id="addEntryForm">
-                            <input type="text" id="username" placeholder="Username" required>
-                            <input type="number" id="score" placeholder="Score" step="any" required>
-                            <button type="submit">Add</button>
-                        </form>
-                    </section>
-
-                    <section class="section">
-                        <h3>Remove Entry</h3>
-                        <form id="removeEntryForm">
-                            <input type="text" id="removeUsername" placeholder="Username" required>
-                            <button type="submit">Remove</button>
-                        </form>
-                    </section>
-
-                    <section class="section">
-                        <h3>Stress Test</h3>
-                        <div class="stress-controls">
-                            <button type="button" id="startStress" class="stress-btn">Start</button>
-                            <button type="button" id="stopStress" class="stress-btn stop">Stop</button>
-                        </div>
-                        <div class="stress-status" id="stressStatus">Idle</div>
-                    </section>
+            <!-- Global System Status Bar -->
+            <div class="stats-overview">
+                <div class="stat-card primary">
+                    <dt>Database Records</dt>
+                    <dd id="totalEntries">0</dd>
+                </div>
+                <div class="stat-card">
+                    <dt>Global Mean</dt>
+                    <dd id="meanScore">0.00</dd>
+                </div>
+                <div class="stat-card">
+                    <dt>Score Range</dt>
+                    <dd id="scoreRange">-- / --</dd>
+                </div>
+                <div class="stat-card">
+                    <dt>Sort Order</dt>
+                    <dd id="activeSortOrder">--</dd>
                 </div>
             </div>
 
-            <div class="stats-grid">
-                <section class="section">
-                    <h3>Statistics</h3>
-                    <dl class="data-list">
-                        <div>
-                            <dt>Total</dt>
-                            <dd id="totalEntries">0</dd>
+            <div class="dashboard-grid">
+                <!-- Left Column: Leaderboard & History -->
+                <div class="col-main">
+                    <section class="section">
+                        <div class="section-header">
+                            <h2>Live Leaderboard</h2>
+                            <div class="header-controls">
+                                <select id="leaderboardLimit">
+                                    <option value="10">Top 10</option>
+                                    <option value="25">Top 25</option>
+                                    <option value="50" selected>Top 50</option>
+                                    <option value="100">Top 100</option>
+                                </select>
+                            </div>
                         </div>
-                        <div>
-                            <dt>Mean</dt>
-                            <dd id="meanScore">0</dd>
+                        <div class="leaderboard-container">
+                            <div id="leaderboard"></div>
                         </div>
-                        <div>
-                            <dt>Median</dt>
-                            <dd id="medianScore">0</dd>
-                        </div>
-                        <div>
-                            <dt>Std Dev</dt>
-                            <dd id="stdDev">0</dd>
-                        </div>
-                        <div>
-                            <dt>Q1 (25th)</dt>
-                            <dd id="q1Score">0</dd>
-                        </div>
-                        <div>
-                            <dt>Q3 (75th)</dt>
-                            <dd id="q3Score">0</dd>
-                        </div>
-                        <div>
-                            <dt>Min</dt>
-                            <dd id="minScore">0</dd>
-                        </div>
-                        <div>
-                            <dt>Max</dt>
-                            <dd id="maxScore">0</dd>
-                        </div>
-                    </dl>
-                </section>
+                    </section>
 
-                <section class="section">
-                    <h3>Performance</h3>
-                    <dl class="data-list">
-                        <div>
-                            <dt>/add</dt>
-                            <dd id="addPerf">0ms</dd>
+                    <section class="section">
+                        <div class="section-header">
+                            <h2>Transactional Event History</h2>
+                            <input type="text" id="historyUser" placeholder="Filter by Uploader ID..." class="search-input">
                         </div>
-                        <div>
-                            <dt>/remove</dt>
-                            <dd id="removePerf">0ms</dd>
+                        <div class="section-content">
+                            <div class="date-filter">
+                                <div class="date-filter-header">
+                                    <label>Date Range Filter</label>
+                                    <button type="button" id="resetDateRange" class="btn-small">RESET</button>
+                                </div>
+                                <div class="date-filter-labels">
+                                    <span id="rangeStartLabel">--</span>
+                                    <span id="rangeEndLabel">--</span>
+                                </div>
+                                <div class="dual-range">
+                                    <input type="range" id="rangeMin" min="0" max="1000" value="0" step="1">
+                                    <input type="range" id="rangeMax" min="0" max="1000" value="1000" step="1">
+                                    <div class="range-track" id="rangeTrack"></div>
+                                </div>
+                            </div>
+                            <div id="historyResults" class="history-list"></div>
+                            <div class="history-paging">
+                                <button type="button" id="historyPrev" disabled>&larr; PREV</button>
+                                <span id="historyPageLabel">PAGE 1</span>
+                                <button type="button" id="historyNext">NEXT &rarr;</button>
+                            </div>
                         </div>
-                        <div>
-                            <dt>/leaderboard</dt>
-                            <dd id="leaderboardPerf">0ms</dd>
+                    </section>
+                </div>
+
+                <!-- Right Column: Deep Analytics & Controls -->
+                <div class="col-side">
+                    <section class="section">
+                        <div class="section-header"><h3>Direct Data Ingress</h3></div>
+                        <div class="section-content">
+                            <form id="addEntryForm" class="control-group">
+                                <input type="text" id="username" placeholder="Uploader ID" required>
+                                <input type="number" id="score" placeholder="Value (f64)" step="any" required>
+                                <button type="submit" class="btn-accent">EXECUTE_INGRESS</button>
+                            </form>
                         </div>
-                        <div>
-                            <dt>/info</dt>
-                            <dd id="infoPerf">0ms</dd>
+                    </section>
+
+                    <section class="section">
+                        <div class="section-header"><h3>Analytical Breakdown</h3></div>
+                        <div class="section-content">
+                            <div class="stats-grid">
+                                <div class="stat-item"><dt>Median</dt><dd id="statMedian">0.00</dd></div>
+                                <div class="stat-item"><dt>Std. Dev</dt><dd id="statStdDev">0.00</dd></div>
+                                <div class="stat-item"><dt>Min / Max</dt><dd id="statMinMax">0 / 0</dd></div>
+                                <div class="stat-item"><dt>Mode</dt><dd id="statMode">0.00</dd></div>
+                                <div class="stat-item"><dt>P25 (Q1)</dt><dd id="statP25">0.00</dd></div>
+                                <div class="stat-item"><dt>P75 (Q3)</dt><dd id="statP75">0.00</dd></div>
+                                <div class="stat-item"><dt>IQR</dt><dd id="statIQR">0.00</dd></div>
+                                <div class="stat-item"><dt>Variance</dt><dd id="statVariance">0.00</dd></div>
+                                <div class="stat-item"><dt>Range</dt><dd id="statRange">0.00</dd></div>
+                            </div>
                         </div>
-                    </dl>
-                </section>
+                    </section>
+
+                    <section class="section">
+                        <div class="section-header"><h3>Score Distribution Histogram</h3></div>
+                        <div class="section-content chart-box">
+                            <canvas id="distributionChart"></canvas>
+                        </div>
+                    </section>
+
+                    <section class="section">
+                        <div class="section-header"><h3>Engine Load Generation</h3></div>
+                        <div class="section-content">
+                            <div class="control-group">
+                                <label>Concurrent Users: <strong id="stressValue">10</strong></label>
+                                <input type="range" id="stressIntensity" min="1" max="50" value="10">
+                                <div class="stress-controls">
+                                    <button type="button" id="startStress" class="btn-accent">START_STRESS</button>
+                                    <button type="button" id="stopStress" class="btn-danger" disabled>STOP</button>
+                                </div>
+                                <div class="stress-status" id="stressStatus">ENGINE_IDLE</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="section">
+                        <div class="section-header"><h3>Request Rate (req/s)</h3></div>
+                        <div class="section-content chart-box">
+                            <canvas id="timelineChart"></canvas>
+                        </div>
+                    </section>
+
+                    <section class="section">
+                        <div class="section-header"><h3>Endpoint Performance</h3></div>
+                        <div class="section-content">
+                            <div id="perfTable" class="perf-table">
+                                <div class="perf-header">
+                                    <span>Endpoint</span>
+                                    <span>Avg Latency</span>
+                                    <span>Requests</span>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
             </div>
-
-            <section class="section">
-                <h3>History</h3>
-                <div class="history-filters">
-                    <input type="text" id="historyUser" placeholder="Username">
-                    <input type="datetime-local" id="historyStart">
-                    <input type="datetime-local" id="historyEnd">
-                    <button type="button" id="historySearch">Search</button>
-                </div>
-                <div id="historyResults"></div>
-                <div class="history-paging">
-                    <button type="button" id="historyPrev" disabled>Prev</button>
-                    <span id="historyPageLabel">Page 1</span>
-                    <button type="button" id="historyNext">Next</button>
-                </div>
-            </section>
         </main>
 
         <main id="adminView" style="display: none;">
-            <section class="section admin-auth" id="adminAuthSection">
-                <h2>Admin Authentication</h2>
-                <form id="adminAuthForm">
-                    <input type="password" id="adminToken" placeholder="Enter Admin Token" required>
-                    <button type="submit">Authenticate</button>
-                </form>
-                <div id="adminStatus" class="admin-status"></div>
-            </section>
-
-            <div id="adminPanel" style="display: none;">
-                <section class="section">
-                    <h2>Board Configuration</h2>
-                    <form id="updateTitleForm">
-                        <label>Board Title</label>
-                        <input type="text" id="newTitle" placeholder="New Board Title" required>
-                        <button type="submit">Update Title</button>
-                    </form>
+            <div class="admin-container">
+                <section class="section" id="adminAuthSection">
+                    <div class="section-header"><h2>Privileged Access Required</h2></div>
+                    <div class="section-content">
+                        <form id="adminAuthForm" class="control-group">
+                            <input type="password" id="adminToken" placeholder="Root Auth Token" required>
+                            <button type="submit" class="btn-accent">AUTHORIZE</button>
+                        </form>
+                        <div id="adminStatus" class="admin-status"></div>
+                    </div>
                 </section>
 
-                <section class="section">
-                    <h2>Sort Order</h2>
-                    <form id="updateSortForm">
-                        <label>Leaderboard Sort Order</label>
-                        <select id="sortOrder" required>
-                            <option value="">Select Sort Order</option>
-                            <option value="descending">Descending (High to Low)</option>
-                            <option value="ascending">Ascending (Low to High)</option>
-                        </select>
-                        <button type="submit">Update Sort Order</button>
-                    </form>
-                </section>
+                <div id="adminPanel" style="display: none;">
+                    <section class="section">
+                        <div class="section-header"><h2>Leaderboard Configuration</h2></div>
+                        <div class="section-content">
+                            <form id="updateTitleForm" class="control-group">
+                                <label>Global Board Label</label>
+                                <input type="text" id="newTitle" placeholder="Identifier String" required>
+                                <button type="submit">UPDATE_TITLE</button>
+                            </form>
+                        </div>
+                    </section>
 
-                <section class="section">
-                    <h2>Session</h2>
-                    <button type="button" id="logoutAdmin" class="logout-btn">Logout</button>
-                </section>
+                    <section class="section">
+                        <div class="section-header"><h2>Ranking Algorithms</h2></div>
+                        <div class="section-content">
+                            <form id="updateSortForm" class="control-group">
+                                <label>Active Sort Strategy</label>
+                                <select id="sortOrder" required>
+                                    <option value="descending">DESCENDING (HI -> LO)</option>
+                                    <option value="ascending">ASCENDING (LO -> HI)</option>
+                                </select>
+                                <button type="submit">COMMIT_STRATEGY</button>
+                            </form>
+                        </div>
+                    </section>
+
+                    <button type="button" id="logoutAdmin" class="btn-danger" style="width: 100%;">DE-AUTHORIZE</button>
+                </div>
             </div>
         </main>
     </div>

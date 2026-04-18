@@ -1,42 +1,83 @@
 const API_BASE_URL = 'http://localhost:3000';
 
-let leaderboardData = [];
-let performanceData = {
-    add: 0,
-    remove: 0,
-    leaderboard: 0,
-    info: 0
-};
+const STRESS_NAMES = [
+    "Alice", "Bob", "Charlie", "David", "Eve", "Frank", "Grace", "Heidi", "Ivan", "Judy",
+    "Karl", "Linda", "Mike", "Nancy", "Oscar", "Peggy", "Quinn", "Rose", "Sam", "Ted",
+    "Ursula", "Victor", "Wendy", "Xander", "Yvonne", "Zelda", "Arthur", "Beatrice", "Conrad", "Diana",
+    "Eric", "Flora", "George", "Hilda", "Isaac", "Julia", "Kevin", "Lois", "Mark", "Nora",
+    "Oliver", "Paula", "Quentin", "Ruth", "Seth", "Tara", "Ulysses", "Vera", "Walter", "Xena"
+];
 
+// Global State
+let charts = {};
+let tpsHistory = Array(30).fill(0);
+let requestCount = 0;
+let lastThroughputTime = Date.now();
+let stressTestRunning = false;
+let stressTestInterval = null;
+let adminToken = null;
+let currentView = 'regular';
+let historyPage = 1;
+const HISTORY_COUNT = 15;
+let dateRangeMin = null; // Date object: earliest known timestamp
+let dateRangeMax = null; // Date object: latest known timestamp
+
+// Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    initCharts();
     setupEvents();
-    fetchLeaderboard();
-    loadBoardTitle();
-    setInterval(fetchLeaderboard, 100);
+    loadBoardConfig();
+
+    // High-frequency UI loop
+    setInterval(updateLoop, 250);
+    // History auto-refresh
+    setInterval(fetchHistory, 3000);
 });
 
-async function loadBoardTitle() {
-    try {
-        const response = await fetch(`${API_BASE_URL}/boardconfig`);
-        if (response.ok) {
-            const config = await response.json();
-            document.querySelector('header h1').textContent = config.title;
-        }
-    } catch (error) {
-        console.error('Failed to load board title:', error);
-    }
-}
+function initCharts() {
+    const commonOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { display: false },
+            y: { beginAtZero: true, grid: { color: '#f5f5f5', borderDash: [2, 2] }, ticks: { font: { size: 9 } } }
+        },
+        animation: { duration: 200 }
+    };
 
-let stressTestInterval = null;
-let stressTestRunning = false;
-let adminToken = null;
-let currentView = 'regular'; // 'regular' or 'admin'
-let historyPage = 1;
-const historyCount = 10;
+    // Request Rate Timeline
+    charts.timeline = new Chart(document.getElementById('timelineChart'), {
+        type: 'line',
+        data: {
+            labels: Array(30).fill(''),
+            datasets: [{
+                borderColor: '#28a745', borderWidth: 1.5, pointRadius: 0, fill: true,
+                backgroundColor: 'rgba(40, 167, 69, 0.05)', data: tpsHistory, tension: 0.3
+            }]
+        },
+        options: commonOptions
+    });
+
+    // Distribution Histogram
+    charts.distribution = new Chart(document.getElementById('distributionChart'), {
+        type: 'bar',
+        data: {
+            labels: ['0', '200', '400', '600', '800', '1k+'],
+            datasets: [{ backgroundColor: '#6f42c1', borderRadius: 2, data: [0, 0, 0, 0, 0, 0] }]
+        },
+        options: { 
+            ...commonOptions, 
+            scales: { 
+                ...commonOptions.scales, 
+                x: { display: true, ticks: { font: { size: 9 } } } 
+            } 
+        }
+    });
+}
 
 function setupEvents() {
     document.getElementById('addEntryForm').addEventListener('submit', handleAdd);
-    document.getElementById('removeEntryForm').addEventListener('submit', handleRemove);
     document.getElementById('startStress').addEventListener('click', startStressTest);
     document.getElementById('stopStress').addEventListener('click', stopStressTest);
     document.getElementById('toggleViewBtn').addEventListener('click', toggleView);
@@ -44,407 +85,373 @@ function setupEvents() {
     document.getElementById('updateTitleForm').addEventListener('submit', handleUpdateTitle);
     document.getElementById('updateSortForm').addEventListener('submit', handleUpdateSort);
     document.getElementById('logoutAdmin').addEventListener('click', handleAdminLogout);
-    document.getElementById('historySearch').addEventListener('click', () => { historyPage = 1; fetchHistory(); });
     document.getElementById('historyPrev').addEventListener('click', () => { historyPage = Math.max(1, historyPage - 1); fetchHistory(); });
     document.getElementById('historyNext').addEventListener('click', () => { historyPage++; fetchHistory(); });
-    fetchHistory();
+    document.getElementById('leaderboardLimit').addEventListener('change', fetchLeaderboard);
+
+    // Stress slider numeric readout
+    const stressSlider = document.getElementById('stressIntensity');
+    stressSlider.addEventListener('input', () => {
+        document.getElementById('stressValue').textContent = stressSlider.value;
+    });
+
+    // Date range dual slider
+    const rangeMin = document.getElementById('rangeMin');
+    const rangeMax = document.getElementById('rangeMax');
+    let rangeTimeout;
+    const onRangeChange = () => {
+        enforceRangeConstraint();
+        updateRangeTrack();
+        updateRangeLabels();
+        clearTimeout(rangeTimeout);
+        rangeTimeout = setTimeout(() => { historyPage = 1; fetchHistory(); }, 300);
+    };
+    rangeMin.addEventListener('input', onRangeChange);
+    rangeMax.addEventListener('input', onRangeChange);
+    document.getElementById('resetDateRange').addEventListener('click', () => {
+        rangeMin.value = 0;
+        rangeMax.value = 1000;
+        updateRangeTrack();
+        updateRangeLabels();
+        historyPage = 1;
+        fetchHistory();
+    });
+
+    let searchTimeout;
+    document.getElementById('historyUser').addEventListener('input', () => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => { historyPage = 1; fetchHistory(); }, 500);
+    });
+}
+
+async function updateLoop() {
+    await Promise.all([
+        fetchLeaderboard(),
+        fetchStats(),
+        fetchPerformance()
+    ]);
+    updateThroughput();
 }
 
 async function fetchLeaderboard() {
+    const limit = document.getElementById('leaderboardLimit').value;
     try {
-        const start = performance.now();
-        const response = await fetch(`${API_BASE_URL}/leaderboard/json`);
-        const duration = Math.round(performance.now() - start);
-
-        if (response.ok) {
-            const data = await response.json();
-            leaderboardData = data.map(entry => ({
-                username: entry.uploader,
-                score: entry.value
-            }));
-            performanceData.leaderboard = duration;
-            render();
+        const res = await fetch(`${API_BASE_URL}/leaderboard/json/${limit}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        const el = document.getElementById('leaderboard');
+        if (data.length === 0) {
+            el.innerHTML = '<div style="text-align:center;padding:40px;color:#999;">SYSTEM_IDLE: No data points found</div>';
+            return;
         }
-    } catch (error) {
-        console.error('Failed to fetch leaderboard:', error);
+
+        el.innerHTML = data.map((item, i) => `
+            <div class="leaderboard-item">
+                <span class="rank">${(i + 1).toString().padStart(2, '0')}</span>
+                <span class="username">${esc(item.uploader)}</span>
+                <span class="timestamp">${formatTime(item.created_at)}</span>
+                <span class="score">${fmt(item.value)}</span>
+            </div>
+        `).join('');
+
+        updateDistribution(data);
+    } catch (e) { console.error('Leaderboard error:', e); }
+}
+
+function updateDistribution(data) {
+    const buckets = [0, 0, 0, 0, 0, 0];
+    data.forEach(item => {
+        const val = item.value;
+        if (val < 200) buckets[0]++;
+        else if (val < 400) buckets[1]++;
+        else if (val < 600) buckets[2]++;
+        else if (val < 800) buckets[3]++;
+        else if (val < 1000) buckets[4]++;
+        else buckets[5]++;
+    });
+    charts.distribution.data.datasets[0].data = buckets;
+    charts.distribution.update('none');
+}
+
+async function fetchStats() {
+    try {
+        const res = await fetch(`${API_BASE_URL}/info`);
+        if (!res.ok) return;
+        const d = await res.json();
+        
+        // Populate all statistical fields from /info (raw server data)
+        document.getElementById('totalEntries').textContent = d.count ?? 0;
+        document.getElementById('meanScore').textContent = fmt(d.mean);
+        document.getElementById('scoreRange').textContent = `${fmt(d.min)} / ${fmt(d.max)}`;
+        document.getElementById('statMedian').textContent = fmt(d.median);
+        document.getElementById('statStdDev').textContent = fmt(d.stddev_pop);
+        document.getElementById('statMinMax').textContent = `${fmt(d.min)} / ${fmt(d.max)}`;
+        document.getElementById('statMode').textContent = fmt(d.mode);
+        document.getElementById('statP25').textContent = fmt(d.p25);
+        document.getElementById('statP75').textContent = fmt(d.p75);
+        document.getElementById('statIQR').textContent = fmt(d.iqr);
+        document.getElementById('statVariance').textContent = fmt(d.variance);
+        document.getElementById('statRange').textContent = fmt(d.range);
+
+        // Update date range slider bounds from server
+        const earliest = parseCreatedAt(d.earliest_at);
+        const latest = parseCreatedAt(d.latest_at);
+        if (earliest && latest) {
+            dateRangeMin = earliest;
+            dateRangeMax = latest;
+            updateRangeLabels();
+        }
+    } catch (e) { console.error('Stats error:', e); }
+}
+
+async function fetchPerformance() {
+    try {
+        const res = await fetch(`${API_BASE_URL}/performance`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const el = document.getElementById('perfTable');
+        const header = '<div class="perf-header"><span>Endpoint</span><span>Avg Latency</span><span>Requests</span></div>';
+        if (data.length === 0) {
+            el.innerHTML = header + '<div style="text-align:center;padding:12px;color:#999;font-size:11px;">No endpoint data</div>';
+            return;
+        }
+        el.innerHTML = header + data.map(e => `
+            <div class="perf-row">
+                <span class="endpoint">${esc(e.endpoint)}</span>
+                <span class="latency">${e.avg_ms.toFixed(3)}ms</span>
+                <span class="req-count">${e.count.toLocaleString()}</span>
+            </div>
+        `).join('');
+    } catch (e) { console.error('Performance error:', e); }
+}
+
+function updateThroughput() {
+    const now = Date.now();
+    const elapsed = (now - lastThroughputTime) / 1000;
+    if (elapsed >= 0.8) {
+        const rps = Math.round(requestCount / elapsed);
+        tpsHistory.push(rps);
+        if (tpsHistory.length > 30) tpsHistory.shift();
+        charts.timeline.data.datasets[0].data = tpsHistory;
+        charts.timeline.update('none');
+        requestCount = 0;
+        lastThroughputTime = now;
     }
+}
+
+async function fetchHistory() {
+    const user = document.getElementById('historyUser').value.trim();
+    const params = new URLSearchParams({ count: HISTORY_COUNT, page: historyPage });
+    if (user) params.set('title', user);
+
+    // Apply date range filter from dual slider
+    const startDate = getDateFromSlider('rangeMin');
+    const endDate = getDateFromSlider('rangeMax');
+    if (startDate) params.set('start', startDate.toISOString());
+    if (endDate) params.set('end', endDate.toISOString());
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/history?${params}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const el = document.getElementById('historyResults');
+        if (data.length === 0) {
+            el.innerHTML = '<div style="text-align:center;padding:20px;color:#999;font-size:11px;">EMPTY_LOG: No matching events</div>';
+        } else {
+            el.innerHTML = data.map(e => `
+                <div class="history-row">
+                    <span>${esc(e.uploader)} <span style="color:#999">&rarr;</span> <strong>${fmt(e.value)}</strong></span>
+                    <span class="time">${formatTime(e.created_at)}</span>
+                </div>
+            `).join('');
+        }
+        document.getElementById('historyPageLabel').textContent = `PAGE ${historyPage}`;
+        document.getElementById('historyPrev').disabled = historyPage <= 1;
+        document.getElementById('historyNext').disabled = data.length < HISTORY_COUNT;
+    } catch (e) { console.error('History error:', e); }
+}
+
+// Date range slider helpers
+function parseCreatedAt(arr) {
+    if (!arr) return null;
+    return new Date(Date.UTC(arr[0], 0, arr[1], arr[2], arr[3], arr[4]));
+}
+
+function getDateFromSlider(sliderId) {
+    if (!dateRangeMin || !dateRangeMax) return null;
+    const slider = document.getElementById(sliderId);
+    const pct = parseInt(slider.value) / 1000;
+    const range = dateRangeMax.getTime() - dateRangeMin.getTime();
+    return new Date(dateRangeMin.getTime() + range * pct);
+}
+
+function enforceRangeConstraint() {
+    const minSlider = document.getElementById('rangeMin');
+    const maxSlider = document.getElementById('rangeMax');
+    if (parseInt(minSlider.value) > parseInt(maxSlider.value)) {
+        minSlider.value = maxSlider.value;
+    }
+}
+
+function updateRangeTrack() {
+    const min = parseInt(document.getElementById('rangeMin').value);
+    const max = parseInt(document.getElementById('rangeMax').value);
+    const track = document.getElementById('rangeTrack');
+    const left = (min / 1000) * 100;
+    const width = ((max - min) / 1000) * 100;
+    track.style.setProperty('--range-left', left + '%');
+    track.style.setProperty('--range-width', width + '%');
+}
+
+function updateRangeLabels() {
+    const startDate = getDateFromSlider('rangeMin');
+    const endDate = getDateFromSlider('rangeMax');
+    document.getElementById('rangeStartLabel').textContent = startDate ? startDate.toLocaleString() : '--';
+    document.getElementById('rangeEndLabel').textContent = endDate ? endDate.toLocaleString() : '--';
+}
+
+async function handleAdd(e) {
+    e.preventDefault();
+    const key = document.getElementById('username').value.trim();
+    const value = parseFloat(document.getElementById('score').value);
+    try {
+        const res = await fetch(`${API_BASE_URL}/add`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key, value })
+        });
+        if (res.ok) {
+            requestCount++;
+            showStatus('INGRESS_SUCCESS');
+            document.getElementById('addEntryForm').reset();
+        }
+    } catch (e) { showStatus('INGRESS_FAILED', true); }
+}
+
+function startStressTest() {
+    if (stressTestRunning) return;
+    stressTestRunning = true;
+    document.getElementById('startStress').disabled = true;
+    document.getElementById('stopStress').disabled = false;
+    const intensity = parseInt(document.getElementById('stressIntensity').value);
+    stressTestInterval = setInterval(async () => {
+        const batchSize = Math.max(1, Math.floor(intensity / 2));
+        const batch = [];
+        for(let i=0; i < batchSize; i++) {
+            const baseName = STRESS_NAMES[Math.floor(Math.random() * STRESS_NAMES.length)];
+            const uploader = `${baseName}_${Math.floor(Math.random() * 11)}`;
+            const val = parseFloat((Math.random() * 1000).toFixed(2));
+            batch.push(fetch(`${API_BASE_URL}/add`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key: uploader, value: val })
+            }).then(() => requestCount++).catch(() => {}));
+        }
+        await Promise.all(batch);
+        document.getElementById('stressStatus').textContent = `LOAD_STATUS: ~${intensity * 10} REQ/SEC`;
+    }, 100);
+}
+
+function stopStressTest() {
+    stressTestRunning = false;
+    clearInterval(stressTestInterval);
+    document.getElementById('startStress').disabled = false;
+    document.getElementById('stopStress').disabled = true;
+    document.getElementById('stressStatus').textContent = 'ENGINE_IDLE';
+}
+
+function fmt(v) { return v != null ? v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'; }
+function esc(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+function formatTime(arr) { 
+    if (!arr) return "N/A";
+    return new Date(Date.UTC(arr[0], 0, arr[1], arr[2], arr[3], arr[4])).toLocaleTimeString(); 
+}
+
+function showStatus(m, err=false) {
+    const el = document.getElementById('statusMessage');
+    el.textContent = m;
+    el.className = 'show';
+    el.style.background = err ? 'var(--danger)' : 'var(--text)';
+    setTimeout(() => el.className = '', 1500);
+}
+
+async function loadBoardConfig() {
+    try {
+        const res = await fetch(`${API_BASE_URL}/boardconfig`);
+        if (res.ok) {
+            const config = await res.json();
+            document.querySelector('header h1').textContent = config.title;
+            document.getElementById('activeSortOrder').textContent = (config.sort_order || '--').toUpperCase();
+        }
+    } catch (e) {}
 }
 
 function toggleView() {
     const regularView = document.getElementById('regularView');
     const adminView = document.getElementById('adminView');
     const toggleBtn = document.getElementById('toggleViewBtn');
-
     if (currentView === 'regular') {
         regularView.style.display = 'none';
-        adminView.style.display = 'flex';
-        toggleBtn.textContent = 'Regular View';
+        adminView.style.display = 'block';
+        toggleBtn.textContent = 'EXIT_ADMIN';
         currentView = 'admin';
     } else {
-        regularView.style.display = 'flex';
+        regularView.style.display = 'block';
         adminView.style.display = 'none';
-        toggleBtn.textContent = 'Admin Mode';
+        toggleBtn.textContent = 'ADMIN_LOGIN';
         currentView = 'regular';
     }
-}
-
-async function handleAdd(e) {
-    e.preventDefault();
-    const username = document.getElementById('username').value.trim();
-    const score = parseFloat(document.getElementById('score').value);
-
-    if (!username || isNaN(score)) return;
-
-    try {
-        const start = performance.now();
-        const response = await fetch(`${API_BASE_URL}/add`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ key: username, value: score })
-        });
-        const duration = Math.round(performance.now() - start);
-        performanceData.add = duration;
-
-        if (response.ok) {
-            document.getElementById('addEntryForm').reset();
-            showStatus('Added');
-            await fetchLeaderboard();
-        } else {
-            showStatus('Failed to add', true);
-        }
-    } catch (error) {
-        showStatus('Error: ' + error.message, true);
-    }
-}
-
-async function handleRemove(e) {
-    e.preventDefault();
-    const username = document.getElementById('removeUsername').value.trim();
-
-    if (!username) return;
-
-    try {
-        const start = performance.now();
-        const response = await fetch(`${API_BASE_URL}/remove/${encodeURIComponent(username)}`, {
-            method: 'DELETE'
-        });
-        const duration = Math.round(performance.now() - start);
-        performanceData.remove = duration;
-
-        if (response.ok) {
-            document.getElementById('removeEntryForm').reset();
-            showStatus('Removed');
-            await fetchLeaderboard();
-        } else if (response.status === 404) {
-            showStatus('Not found', true);
-        } else {
-            showStatus('Failed to remove', true);
-        }
-    } catch (error) {
-        showStatus('Error: ' + error.message, true);
-    }
-}
-
-function render() {
-    renderLeaderboard();
-    fetchStats();
-    fetchPerformance();
-}
-
-function fmt(v) {
-    return v != null
-        ? v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-        : '0';
-}
-
-async function fetchStats() {
-    try {
-        const response = await fetch(`${API_BASE_URL}/info`);
-        if (response.ok) {
-            const data = await response.json();
-            document.getElementById('totalEntries').textContent = data.count ?? 0;
-            document.getElementById('meanScore').textContent = fmt(data.mean);
-            document.getElementById('medianScore').textContent = fmt(data.median);
-            document.getElementById('stdDev').textContent = fmt(data.stddev_pop);
-            document.getElementById('q1Score').textContent = fmt(data.p25);
-            document.getElementById('q3Score').textContent = fmt(data.p75);
-            document.getElementById('minScore').textContent = fmt(data.min);
-            document.getElementById('maxScore').textContent = fmt(data.max);
-        }
-    } catch (error) {
-        console.error('Failed to fetch stats:', error);
-    }
-}
-
-async function fetchPerformance() {
-    try {
-        const response = await fetch(`${API_BASE_URL}/performance`);
-        if (response.ok) {
-            const data = await response.json();
-            const lookup = {};
-            data.forEach(e => lookup[e.endpoint] = e.avg_ms);
-
-            document.getElementById('addPerf').textContent =
-                (lookup['/add'] || 0).toFixed(1) + 'ms';
-            document.getElementById('removePerf').textContent =
-                (lookup['/remove'] || 0).toFixed(1) + 'ms';
-            document.getElementById('leaderboardPerf').textContent =
-                (lookup['/leaderboard/json'] || 0).toFixed(1) + 'ms';
-            document.getElementById('infoPerf').textContent =
-                (lookup['/info'] || 0).toFixed(1) + 'ms';
-        }
-    } catch (error) {
-        console.error('Failed to fetch performance:', error);
-    }
-}
-
-async function fetchHistory() {
-    const params = new URLSearchParams({ count: historyCount, page: historyPage });
-    const title = document.getElementById('historyUser').value.trim();
-    const start = document.getElementById('historyStart').value;
-    const end = document.getElementById('historyEnd').value;
-    if (title) params.set('title', title);
-    if (start) params.set('start', new Date(start).toISOString());
-    if (end) params.set('end', new Date(end).toISOString());
-
-    try {
-        const response = await fetch(`${API_BASE_URL}/history?${params}`);
-        if (!response.ok) return;
-        const data = await response.json();
-        const el = document.getElementById('historyResults');
-        if (data.length === 0) {
-            el.innerHTML = '<div style="text-align:center;padding:16px;color:#888;">No history</div>';
-        } else {
-            el.innerHTML = data.map(e => `
-                <div class="history-row">
-                    <span class="username">${esc(e.uploader)}</span>
-                    <span class="score">${e.value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                    <span class="history-time">${formatTime(e.created_at)}</span>
-                </div>
-            `).join('');
-        }
-        document.getElementById('historyPageLabel').textContent = `Page ${historyPage}`;
-        document.getElementById('historyPrev').disabled = historyPage <= 1;
-        document.getElementById('historyNext').disabled = data.length < historyCount;
-    } catch (error) {
-        console.error('Failed to fetch history:', error);
-    }
-}
-
-function renderLeaderboard() {
-    const el = document.getElementById('leaderboard');
-    const top10 = leaderboardData.slice(0, 10);
-
-    if (top10.length === 0) {
-        el.innerHTML = '<div style="text-align: center; padding: 20px; color: #888;">No entries yet</div>';
-        return;
-    }
-
-    el.innerHTML = top10.map((entry, i) => `
-        <div class="leaderboard-item">
-            <span class="rank">${i + 1}</span>
-            <span class="username">${esc(entry.username)}</span>
-            <span class="score">${entry.score.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-        </div>
-    `).join('');
-}
-
-function showStatus(msg, isError = false) {
-    const el = document.getElementById('statusMessage');
-    el.textContent = msg;
-    el.className = isError ? 'show error' : 'show';
-    setTimeout(() => el.classList.remove('show'), 2000);
-}
-
-function formatTime(arr) {
-    return new Date(Date.UTC(arr[0], 0, arr[1], arr[2], arr[3], arr[4])).toLocaleString();
-}
-
-function esc(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-function startStressTest() {
-    if (stressTestRunning) return;
-
-    stressTestRunning = true;
-    document.getElementById('startStress').disabled = true;
-    document.getElementById('stopStress').disabled = false;
-    document.getElementById('stressStatus').textContent = 'Running...';
-
-    let count = 0;
-    stressTestInterval = setInterval(async () => {
-        const username = `User${Math.floor(Math.random() * 100000)}`;
-        const score = parseFloat((Math.random() * 100000).toFixed(2));
-
-        try {
-            await fetch(`${API_BASE_URL}/add`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ key: username, value: score })
-            });
-            if (!stressTestRunning) return;
-            count++;
-            document.getElementById('stressStatus').textContent = `Running... (${count} requests)`;
-        } catch (error) {
-            console.error('Stress test error:', error);
-        }
-    }, 100);
-}
-
-function stopStressTest() {
-    if (!stressTestRunning) return;
-
-    stressTestRunning = false;
-    clearInterval(stressTestInterval);
-    document.getElementById('startStress').disabled = false;
-    document.getElementById('stopStress').disabled = true;
-    document.getElementById('stressStatus').textContent = 'Idle';
-
-    fetchLeaderboard();
 }
 
 async function handleAdminAuth(e) {
     e.preventDefault();
     const token = document.getElementById('adminToken').value.trim();
-
-    if (!token) return;
-
     try {
-        const response = await fetch(`${API_BASE_URL}/admin/config`, {
+        const res = await fetch(`${API_BASE_URL}/admin/config`, {
             method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
             body: JSON.stringify({})
         });
-
-        if (response.ok) {
+        if (res.ok) {
             adminToken = token;
             document.getElementById('adminAuthSection').style.display = 'none';
-            document.getElementById('adminPanel').style.display = 'flex';
-            showStatus('Admin authenticated');
-            await loadBoardConfig();
-        } else {
-            showStatus('Invalid admin token', true);
-            document.getElementById('adminStatus').textContent = 'Authentication failed';
-            document.getElementById('adminStatus').className = 'admin-status error';
-        }
-    } catch (error) {
-        showStatus('Authentication error', true);
-        document.getElementById('adminStatus').textContent = 'Error';
-        document.getElementById('adminStatus').className = 'admin-status error';
-    }
-}
-
-async function loadBoardConfig() {
-    try {
-        const response = await fetch(`${API_BASE_URL}/boardconfig`);
-        if (response.ok) {
-            const config = await response.json();
-            document.getElementById('newTitle').placeholder = `Current: ${config.title}`;
-            document.getElementById('sortOrder').value = config.sort_order;
-        }
-    } catch (error) {
-        console.error('Failed to load board config:', error);
-    }
+            document.getElementById('adminPanel').style.display = 'block';
+            showStatus('AUTH_VERIFIED');
+        } else { showStatus('AUTH_DENIED', true); }
+    } catch (e) { showStatus('AUTH_ERROR', true); }
 }
 
 async function handleUpdateTitle(e) {
     e.preventDefault();
-    const newTitle = document.getElementById('newTitle').value.trim();
-
-    if (!newTitle || !adminToken) return;
-
+    const title = document.getElementById('newTitle').value.trim();
     try {
-        const response = await fetch(`${API_BASE_URL}/admin/config`, {
+        const res = await fetch(`${API_BASE_URL}/admin/config`, {
             method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${adminToken}`
-            },
-            body: JSON.stringify({ title: newTitle })
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+            body: JSON.stringify({ title })
         });
-
-        if (response.ok) {
-            showStatus('Title updated');
-            document.getElementById('updateTitleForm').reset();
-            await loadBoardTitle();
-            await loadBoardConfig();
-        } else {
-            showStatus('Failed to update title', true);
-        }
-    } catch (error) {
-        showStatus('Update error', true);
-    }
+        if (res.ok) { showStatus('CONFIG_UPDATED'); loadBoardConfig(); }
+    } catch (e) {}
 }
 
 async function handleUpdateSort(e) {
     e.preventDefault();
-    const sortOrder = document.getElementById('sortOrder').value;
-
-    if (!sortOrder || !adminToken) return;
-
+    const sort_order = document.getElementById('sortOrder').value;
     try {
-        const response = await fetch(`${API_BASE_URL}/admin/config`, {
+        const res = await fetch(`${API_BASE_URL}/admin/config`, {
             method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${adminToken}`
-            },
-            body: JSON.stringify({ sort_order: sortOrder })
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+            body: JSON.stringify({ sort_order })
         });
-
-        if (response.ok) {
-            showStatus('Sort order updated');
-            await loadBoardConfig();
-            await fetchLeaderboard();
-        } else {
-            showStatus('Failed to update sort order', true);
-        }
-    } catch (error) {
-        showStatus('Update error', true);
-    }
+        if (res.ok) { showStatus('LOGIC_UPDATED'); loadBoardConfig(); }
+    } catch (e) {}
 }
 
 function handleAdminLogout() {
     adminToken = null;
     document.getElementById('adminPanel').style.display = 'none';
     document.getElementById('adminAuthSection').style.display = 'block';
-    document.getElementById('adminAuthForm').reset();
-    document.getElementById('adminStatus').textContent = '';
-    document.getElementById('adminStatus').className = 'admin-status';
-    showStatus('Logged out');
+    showStatus('LOGOUT_SUCCESS');
 }
-
-// API helper functions for console debugging
-window.api = {
-    async add(username, score) {
-        const res = await fetch(`${API_BASE_URL}/add`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ key: username, value: score })
-        });
-        return res.json();
-    },
-
-    async remove(username) {
-        const res = await fetch(`${API_BASE_URL}/remove/${encodeURIComponent(username)}`, {
-            method: 'DELETE'
-        });
-        return res.status;
-    },
-
-    async getLeaderboard() {
-        const res = await fetch(`${API_BASE_URL}/leaderboard/json`);
-        return res.json();
-    },
-
-    async getBoardConfig() {
-        const res = await fetch(`${API_BASE_URL}/boardconfig`);
-        return res.json();
-    }
-};
