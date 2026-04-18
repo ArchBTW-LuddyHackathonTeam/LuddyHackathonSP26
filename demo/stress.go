@@ -379,7 +379,7 @@ func main() {
 	// ── Report ────────────────────────────────────────────────────────────────
 
 	fmt.Printf("\n\n╔══════════════════════════════════════════════════════════════════════╗\n")
-	fmt.Printf("║                         STRESS TEST REPORT                          ║\n")
+	fmt.Printf("║                         STRESS TEST REPORT                           ║\n")
 	fmt.Printf("╚══════════════════════════════════════════════════════════════════════╝\n\n")
 
 	fmt.Printf("  %-28s %s\n", "Total Requests:", fmt.Sprintf("%d", global.Count))
