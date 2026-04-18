@@ -12,8 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEvents();
     fetchLeaderboard();
     loadBoardTitle();
-    // Refresh leaderboard every 2 seconds
-    setInterval(fetchLeaderboard, 2000);
+    setInterval(fetchLeaderboard, 100);
 });
 
 async function loadBoardTitle() {
@@ -53,7 +52,6 @@ async function fetchLeaderboard() {
 
         if (response.ok) {
             const data = await response.json();
-            // Convert API format (uploader, value) to display format (username, score)
             leaderboardData = data.map(entry => ({
                 username: entry.uploader,
                 score: entry.value
@@ -235,8 +233,8 @@ function startStressTest() {
 
     let count = 0;
     stressTestInterval = setInterval(async () => {
-        const username = `User${Math.floor(Math.random() * 10000)}`;
-        const score = parseFloat((Math.random() * 10000).toFixed(2));
+        const username = `User${Math.floor(Math.random() * 100000)}`;
+        const score = parseFloat((Math.random() * 100000).toFixed(2));
 
         try {
             await fetch(`${API_BASE_URL}/add`, {
@@ -244,12 +242,13 @@ function startStressTest() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ key: username, value: score })
             });
+            if (!stressTestRunning) return;
             count++;
             document.getElementById('stressStatus').textContent = `Running... (${count} requests)`;
         } catch (error) {
             console.error('Stress test error:', error);
         }
-    }, 100);
+    }, 0);
 }
 
 function stopStressTest() {

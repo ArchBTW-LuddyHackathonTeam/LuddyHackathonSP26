@@ -1,7 +1,8 @@
-use sqlx::{prelude::FromRow, PgPool};
+use serde::Serialize;
+use sqlx::{PgPool, prelude::FromRow};
 use uuid::Uuid;
 
-#[derive(Debug, FromRow)]
+#[derive(Serialize, Debug, FromRow)]
 pub struct ScoreHistory {
     pub id: Uuid,
     pub uploader: String,
@@ -10,6 +11,30 @@ pub struct ScoreHistory {
 }
 
 impl ScoreHistory {
+    /// TODO
+    pub async fn all(pool: &PgPool, count: i64, page: i64) -> Result<Vec<Self>, sqlx::Error> {
+        sqlx::query_as("SELECT id, uploader, created_at, value FROM score_history ORDER BY created_at DESC LIMIT $1 OFFSET $2")
+            .bind(count)
+            .bind(count*(page - 1))
+            .fetch_all(pool)
+            .await
+    }
+
+    /// TODO
+    pub async fn from_user(
+        pool: &PgPool,
+        user: String,
+        count: i64,
+        page: i64,
+    ) -> Result<Vec<Self>, sqlx::Error> {
+        sqlx::query_as("SELECT id, uploader, created_at, value FROM score_history WHERE uploader = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3")
+            .bind(user)
+            .bind(count)
+            .bind(count*(page - 1))
+            .fetch_all(pool)
+            .await
+    }
+
     /// Fetch a single score history entry by its id
     pub async fn from_id(pool: &PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as("SELECT id, uploader, created_at, value FROM score_history WHERE id = $1")

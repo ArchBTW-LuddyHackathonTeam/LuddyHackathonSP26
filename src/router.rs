@@ -338,9 +338,9 @@ async fn metrics_middleware(
     if path != "/performance" {
         let normalized = if path.starts_with("/remove/") {
             "/remove".to_string()
-        } else if path.starts_with("/leaderboard/json/") {
+        } else if path.starts_with("/leaderboard/json") {
             "/leaderboard/json".to_string()
-        } else if path.starts_with("/leaderboard/") && path != "/leaderboard/" {
+        } else if path.starts_with("/leaderboard/") {
             "/leaderboard".to_string()
         } else {
             path
@@ -371,8 +371,8 @@ pub fn app(state: AppState) -> Router {
         .route("/remove/{uploader}", delete(remove_handler))
         .route("/performance", get(performance_handler))
         .route("/info", get(info_handler))
-        .route("/history", get(history_handler))
         .route("/boardconfig", get(board_config_handler))
+        .nest("/history", routes::history::router())
         .nest("/admin", routes::admin::router(state.clone()))
         .nest("/leaderboard", routes::leaderboard::router())
         .layer(cors)
