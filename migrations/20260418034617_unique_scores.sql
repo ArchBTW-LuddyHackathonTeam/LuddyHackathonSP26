@@ -1,3 +1,3 @@
 -- Add migration script here
 ALTER TABLE score DROP COLUMN id;
-ALTER TABLE score ADD CONSTRAINT score_name_pkey PRIMARY KEY (name);
+ALTER TABLE score ADD CONSTRAINT score_uploader_pkey PRIMARY KEY (uploader);
