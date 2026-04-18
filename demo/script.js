@@ -18,7 +18,7 @@ let mockPerformance = {
     info: 10
 };
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://localhost:3000';
 
 document.addEventListener('DOMContentLoaded', () => {
     render();
@@ -27,12 +27,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
 let stressTestInterval = null;
 let stressTestRunning = false;
+let adminToken = null;
+let currentView = 'regular'; // 'regular' or 'admin'
 
 function setupEvents() {
     document.getElementById('addEntryForm').addEventListener('submit', handleAdd);
     document.getElementById('removeEntryForm').addEventListener('submit', handleRemove);
     document.getElementById('startStress').addEventListener('click', startStressTest);
     document.getElementById('stopStress').addEventListener('click', stopStressTest);
+    document.getElementById('toggleViewBtn').addEventListener('click', toggleView);
+    document.getElementById('adminAuthForm').addEventListener('submit', handleAdminAuth);
+    document.getElementById('updateTitleForm').addEventListener('submit', handleUpdateTitle);
+    document.getElementById('updateSortForm').addEventListener('submit', handleUpdateSort);
+    document.getElementById('logoutAdmin').addEventListener('click', handleAdminLogout);
+}
+
+function toggleView() {
+    const regularView = document.getElementById('regularView');
+    const adminView = document.getElementById('adminView');
+    const toggleBtn = document.getElementById('toggleViewBtn');
+
+    if (currentView === 'regular') {
+        regularView.style.display = 'none';
+        adminView.style.display = 'flex';
+        toggleBtn.textContent = 'Regular View';
+        currentView = 'admin';
+    } else {
+        regularView.style.display = 'flex';
+        adminView.style.display = 'none';
+        toggleBtn.textContent = 'Admin Mode';
+        currentView = 'regular';
+    }
 }
 
 async function handleAdd(e) {
@@ -181,6 +206,103 @@ function stopStressTest() {
     document.getElementById('stressStatus').textContent = 'Idle';
 
     render();
+}
+
+async function handleAdminAuth(e) {
+    e.preventDefault();
+    const token = document.getElementById('adminToken').value.trim();
+
+    if (!token) return;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/admin/config`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({})
+        });
+
+        if (response.ok) {
+            adminToken = token;
+            document.getElementById('adminAuthSection').style.display = 'none';
+            document.getElementById('adminPanel').style.display = 'flex';
+            showStatus('Admin authenticated');
+        } else {
+            showStatus('Invalid admin token', true);
+            document.getElementById('adminStatus').textContent = 'Authentication failed';
+            document.getElementById('adminStatus').className = 'admin-status error';
+        }
+    } catch (error) {
+        showStatus('Authentication error', true);
+        document.getElementById('adminStatus').textContent = 'Error';
+        document.getElementById('adminStatus').className = 'admin-status error';
+    }
+}
+
+async function handleUpdateTitle(e) {
+    e.preventDefault();
+    const newTitle = document.getElementById('newTitle').value.trim();
+
+    if (!newTitle || !adminToken) return;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/admin/config`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${adminToken}`
+            },
+            body: JSON.stringify({ title: newTitle })
+        });
+
+        if (response.ok) {
+            showStatus('Title updated');
+            document.getElementById('updateTitleForm').reset();
+        } else {
+            showStatus('Failed to update title', true);
+        }
+    } catch (error) {
+        showStatus('Update error', true);
+    }
+}
+
+async function handleUpdateSort(e) {
+    e.preventDefault();
+    const sortOrder = document.getElementById('sortOrder').value;
+
+    if (!sortOrder || !adminToken) return;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/admin/config`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${adminToken}`
+            },
+            body: JSON.stringify({ sort_order: sortOrder })
+        });
+
+        if (response.ok) {
+            showStatus('Sort order updated');
+            document.getElementById('updateSortForm').reset();
+        } else {
+            showStatus('Failed to update sort order', true);
+        }
+    } catch (error) {
+        showStatus('Update error', true);
+    }
+}
+
+function handleAdminLogout() {
+    adminToken = null;
+    document.getElementById('adminPanel').style.display = 'none';
+    document.getElementById('adminAuthSection').style.display = 'block';
+    document.getElementById('adminAuthForm').reset();
+    document.getElementById('adminStatus').textContent = '';
+    document.getElementById('adminStatus').className = 'admin-status';
+    showStatus('Logged out');
 }
 
 window.api = {

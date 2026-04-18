@@ -8,6 +8,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
+use tower_http::cors::{Any, CorsLayer};
 
 use crate::{
     config::{Config, LeaderboardSortOrder},
@@ -83,21 +84,9 @@ async fn history_handler(State(_state): State<AppState>, Query(_params): Query<H
 }
 
 #[derive(Serialize)]
-struct BoardNameResponse {
-    title: String,
-}
-
-#[derive(Serialize)]
 struct BoardConfigResponse {
     title: String,
     sort_order: LeaderboardSortOrder,
-}
-
-async fn board_name_handler(State(state): State<AppState>) -> Json<BoardNameResponse> {
-    let config = state.config.read().await;
-    Json(BoardNameResponse {
-        title: config.leaderboard.title.clone(),
-    })
 }
 
 async fn board_config_handler(State(state): State<AppState>) -> Json<BoardConfigResponse> {
@@ -109,6 +98,11 @@ async fn board_config_handler(State(state): State<AppState>) -> Json<BoardConfig
 }
 
 pub fn app(state: AppState) -> Router {
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any);
+
     Router::new()
         .route("/health", get(|| async { "OK" }))
         .route("/add", post(add_handler))
@@ -116,8 +110,9 @@ pub fn app(state: AppState) -> Router {
         .route("/performance", get(performance_handler))
         .route("/info", get(info_handler))
         .route("/history", get(history_handler))
-        .route("/boardname", get(board_name_handler))
         .route("/boardconfig", get(board_config_handler))
         .nest("/admin", routes::admin::router(state.clone()))
+        .nest("/leaderboard", routes::leaderboard::router())
+        .layer(cors)
         .with_state(state)
 }
