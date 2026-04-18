@@ -118,6 +118,6 @@ pub fn app(state: AppState) -> Router {
         .route("/history", get(history_handler))
         .route("/boardname", get(board_name_handler))
         .route("/boardconfig", get(board_config_handler))
-        .nest("/admin", routes::admin::router())
+        .nest("/admin", routes::admin::router(state.clone()))
         .with_state(state)
 }

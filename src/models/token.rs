@@ -49,11 +49,15 @@ impl Token {
             .map(|r| r.rows_affected())
     }
 
+    pub fn hash(token: &str) -> String {
+        let mut h = Sha256::new();
+        h.update(token);
+        return hex::encode(h.finalize());
+    }
+
     pub async fn new(pool: &PgPool) -> Result<String, sqlx::Error> {
         let new_token = Uuid::new_v4().to_string();
-        let mut h = Sha256::new();
-        h.update(&new_token);
-        Token::create(&pool, hex::encode(h.finalize()))
+        Token::create(&pool, Token::hash(&new_token))
             .await
             .map(|_| new_token)
     }
