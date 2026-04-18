@@ -1,6 +1,7 @@
+use serde::Serialize;
 use sqlx::{prelude::FromRow, PgPool};
 
-#[derive(Debug, FromRow)]
+#[derive(Debug, FromRow, Serialize)]
 pub struct Score {
     pub uploader: String,
     pub created_at: time::PrimitiveDateTime,
