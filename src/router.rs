@@ -115,5 +115,6 @@ pub fn app(state: AppState) -> Router {
         .route("/boardname", get(board_name_handler))
         .route("/boardconfig", get(board_config_handler))
         .nest("/admin", routes::admin::router())
+        .nest("/leaderboard", routes::leaderboard::router())
         .with_state(state)
 }
