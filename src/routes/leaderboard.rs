@@ -4,6 +4,7 @@ use axum::{
     routing::get,
     Json, Router,
 };
+use tabled::{settings::Style, Table};
 
 use crate::{models::score::Score, router::AppState};
 
@@ -16,8 +17,16 @@ pub fn router() -> Router<AppState> {
 }
 
 /// Returns a pretty-print version of the top 10 on the leaderboard
-pub async fn get_leaderboard(State(_state): State<AppState>) {
-    todo!("Basic pretty print")
+pub async fn get_leaderboard(State(state): State<AppState>) -> Result<String, StatusCode> {
+    let scores: Vec<Score> =
+        Score::leaderboard(&state.db, state.config.read().await.leaderboard.sort_order)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let mut table: Table = Table::new(scores);
+    table.with(Style::markdown());
+
+    Ok(table.to_string())
 }
 
 /// Returns a json version of the top 10 on the leaderboard
@@ -33,10 +42,21 @@ pub async fn get_leaderboard_json(
 
 /// Returns a pretty-print version of the top num on the leaderboard
 pub async fn get_leaderboard_num(
-    State(_state): State<AppState>,
-    Path(_num): Path<i32>,
-) -> Result<Json<Vec<Score>>, StatusCode> {
-    todo!("Num pretty print")
+    State(state): State<AppState>,
+    Path(num): Path<i32>,
+) -> Result<String, StatusCode> {
+    let scores: Vec<Score> = Score::leaderboard_num(
+        &state.db,
+        num,
+        state.config.read().await.leaderboard.sort_order,
+    )
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let mut table: Table = Table::new(scores);
+    table.with(Style::markdown());
+
+    Ok(table.to_string())
 }
 
 /// Returns a json version of the top num on the leaderboard

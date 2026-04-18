@@ -1,14 +1,18 @@
 use serde::Serialize;
 use sqlx::{prelude::FromRow, PgPool};
+use tabled::Tabled;
 
 use crate::config::LeaderboardSortOrder;
 
 const LEADERBOARD_SIZE: i32 = 10;
 
-#[derive(Debug, FromRow, Serialize)]
+#[derive(Debug, FromRow, Serialize, Tabled)]
 pub struct Score {
+    #[tabled(order = 0)]
     pub uploader: String,
+    #[tabled(order = 2)]
     pub created_at: time::PrimitiveDateTime,
+    #[tabled[order = 1]]
     pub value: f64,
 }
 

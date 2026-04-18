@@ -18,3 +18,4 @@ toml = "1.1.2"
 uuid = { version = "1.23.1", features = ["serde", "v4"] }
 utoipa = { version = "5", features = ["axum_extras"] }
 utoipa-swagger-ui = { version = "9", features = ["axum", "vendored"] }
+tabled = "0.20.0"
