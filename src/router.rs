@@ -35,13 +35,6 @@ pub struct AddRequest {
     value: f64,
 }
 
-#[derive(Deserialize)]
-pub struct HistoryQuery {
-    key: Option<String>,
-    start: Option<String>,
-    end: Option<String>,
-}
-
 #[utoipa::path(
     get,
     path = "/health",
@@ -100,10 +93,6 @@ async fn info_handler(State(_state): State<AppState>) {
     todo!()
 }
 
-async fn history_handler(State(_state): State<AppState>, Query(_params): Query<HistoryQuery>) {
-    todo!()
-}
-
 #[derive(Serialize)]
 struct BoardConfigResponse {
     title: String,
@@ -140,14 +129,11 @@ pub fn app(state: AppState) -> Router {
         .route("/remove/{uploader}", delete(remove_handler))
         .route("/performance", get(performance_handler))
         .route("/info", get(info_handler))
-        .route("/history", get(history_handler))
         .route("/boardconfig", get(board_config_handler))
+        .nest("/history", routes::history::router())
         .nest("/admin", routes::admin::router(state.clone()))
         .nest("/leaderboard", routes::leaderboard::router())
         .layer(cors)
-        .merge(
-            SwaggerUi::new("/swagger-ui")
-                .url("/api-docs/openapi.json", ApiDoc::openapi())
-        )
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .with_state(state)
 }
