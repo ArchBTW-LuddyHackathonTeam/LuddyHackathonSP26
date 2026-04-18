@@ -1,3 +1,5 @@
+use std::io::ErrorKind;
+
 use clap::Parser;
 use luddy_hackathon_sp26::{
     config::Config,
@@ -7,11 +9,7 @@ use sqlx::postgres::PgPoolOptions;
 use uuid::Uuid;
 
 #[derive(Parser)]
-struct Args {
-    /// setup flag lol (TODO: proper english)
-    #[arg(short, long)]
-    setup: bool,
-}
+struct Args {}
 
 #[tokio::main]
 async fn main() {
@@ -32,21 +30,22 @@ async fn main() {
 
     let config: Config;
 
-    if args.setup {
-        config = Config {
-            secret: Uuid::new_v4(),
-        };
-        config
-            .save()
-            .await
-            .expect("There was an issue saving the newly created config");
-        println!("{}", toml::to_string_pretty(&config).unwrap());
-    } else {
-        let raw_config = tokio::fs::read_to_string("config.toml")
-            .await
-            .expect("There was an error loading the config.toml file");
-        config = toml::from_str(raw_config.as_str()).expect("There was an error parsing the config file, you can use the --setup flag to create a new one");
-    }
+    match tokio::fs::read_to_string("config.toml").await {
+        Ok(raw_config) => {
+            config = toml::from_str(raw_config.as_str())
+                .expect("There was an error parsing the config file")
+        }
+        Err(e) if e.kind() == ErrorKind::NotFound => {
+            config = Config {
+                secret: Uuid::new_v4(),
+            };
+            config
+                .save()
+                .await
+                .expect("There was an error saving the newly created config.toml file");
+        }
+        Err(e) => panic!("There was an error loading the config.toml file: {}", e),
+    };
 
     println!("Admin Secret: {}", config.secret);
 
