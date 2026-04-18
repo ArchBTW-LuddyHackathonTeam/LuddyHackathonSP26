@@ -204,8 +204,8 @@ async function fetchHistory() {
     const start = document.getElementById('historyStart').value;
     const end = document.getElementById('historyEnd').value;
     if (title) params.set('title', title);
-    if (start) params.set('start', start);
-    if (end) params.set('end', end + ' 23:59:59');
+    if (start) params.set('start', new Date(start).toISOString());
+    if (end) params.set('end', new Date(end).toISOString());
 
     try {
         const response = await fetch(`${API_BASE_URL}/history?${params}`);
@@ -257,10 +257,7 @@ function showStatus(msg, isError = false) {
 }
 
 function formatTime(arr) {
-    const d = new Date(arr[0], 0);
-    d.setDate(arr[1]);
-    d.setHours(arr[2], arr[3], arr[4]);
-    return d.toLocaleString();
+    return new Date(Date.UTC(arr[0], 0, arr[1], arr[2], arr[3], arr[4])).toLocaleString();
 }
 
 function esc(text) {
