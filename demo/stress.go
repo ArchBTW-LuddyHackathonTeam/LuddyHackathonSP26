@@ -497,7 +497,7 @@ func main() {
 	fmt.Printf("\n  Peak throughput: %.0f req/s across %d workers.\n\n", throughput, *concurrency)
 
 	fmt.Printf("╔══════════════════════════════════════════════════════════════════════╗\n")
-	fmt.Printf("║  Done. Re-run with -concurrency and -duration to explore limits.    ║\n")
+	fmt.Printf("║  Done. Re-run with -concurrency and -duration to explore limits.     ║\n")
 	fmt.Printf("╚══════════════════════════════════════════════════════════════════════╝\n\n")
 
 	os.Exit(0)
