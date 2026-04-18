@@ -1,10 +1,12 @@
-.PHONY: up down reset-password
+.PHONY: run down reset-password
+
+COMPOSE := $(shell command -v docker-compose >/dev/null 2>&1 && echo docker-compose || echo "docker compose")
 
 run:
-	docker-compose up --build
+	$(COMPOSE) up --build
 
 down:
-	docker-compose down
+	$(COMPOSE) down
 
 reset-password:
-	docker-compose run --rm api cargo run --release -- --reset-password
+	$(COMPOSE) run --rm api cargo run --release -- --reset-password
