@@ -2,5 +2,5 @@
 port = 3000
 
 [leaderboard]
-title = "test"
-sort_order = "descending"
+title = "string"
+sort_order = "ascending"

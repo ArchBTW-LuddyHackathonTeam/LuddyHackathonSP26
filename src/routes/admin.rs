@@ -7,6 +7,7 @@ use axum::{
     routing::patch,
 };
 use serde::Deserialize;
+use utoipa::ToSchema;
 
 use crate::{
     config::{Config, LeaderboardSortOrder},
@@ -14,9 +15,14 @@ use crate::{
     router::AppState,
 };
 
-#[derive(Deserialize)]
+/// Request body for updating the leaderboard configuration.
+///
+/// All fields are optional — only the supplied fields will be updated.
+#[derive(Deserialize, ToSchema)]
 pub struct UpdateConfigRequest {
+    /// New human-readable title for the leaderboard.
     title: Option<String>,
+    /// New sort order (`"ascending"` or `"descending"`).
     sort_order: Option<LeaderboardSortOrder>,
 }
 
@@ -43,7 +49,28 @@ async fn auth_middleware(
     }
 }
 
-async fn update_config_handler(
+/// Update the leaderboard configuration.
+///
+/// Partially updates the leaderboard configuration.  Supply only the fields
+/// you want to change.  Changes are persisted to `config.toml` immediately.
+///
+/// Requires a valid admin Bearer token in the `Authorization` header.
+#[utoipa::path(
+    patch,
+    path = "/admin/config",
+    request_body = UpdateConfigRequest,
+    responses(
+        (status = 200, description = "Configuration updated successfully", body = Config),
+        (status = 400, description = "Invalid sort_order value supplied"),
+        (status = 401, description = "Missing or invalid Authorization header"),
+        (status = 500, description = "Database or filesystem error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "admin"
+)]
+pub async fn update_config_handler(
     State(state): State<AppState>,
     Json(req): Json<UpdateConfigRequest>,
 ) -> Result<Json<Config>, StatusCode> {

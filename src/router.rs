@@ -11,7 +11,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use tower_http::cors::{Any, CorsLayer};
-use utoipa::{OpenApi, ToSchema};
+use utoipa::{IntoParams, OpenApi, ToSchema};
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
@@ -36,29 +36,54 @@ pub struct AppState {
     pub metrics: Arc<RwLock<HashMap<String, EndpointMetrics>>>,
 }
 
+/// Response body for the health check endpoint.
 #[derive(Serialize, ToSchema)]
 pub struct HealthResponse {
+    /// Always `"OK"` when the service is healthy.
     status: String,
 }
 
-#[derive(Deserialize)]
+/// Request body for submitting or updating a score.
+#[derive(Deserialize, ToSchema)]
 pub struct AddRequest {
+    /// The participant's unique identifier (max 32 characters).
     key: String,
+    /// The score value to record.
     value: f64,
 }
 
-#[derive(Deserialize)]
+/// Query parameters for the score history endpoint.
+#[derive(Deserialize, ToSchema, IntoParams)]
 pub struct HistoryQuery {
+    /// Filter history by this participant key.
     key: Option<String>,
+    /// ISO-8601 start datetime (inclusive).
     start: Option<String>,
+    /// ISO-8601 end datetime (inclusive).
     end: Option<String>,
 }
 
+/// A single entry in the per-endpoint performance report.
+#[derive(Serialize, ToSchema)]
+pub struct PerformanceEntry {
+    /// The normalized endpoint path (e.g. `/add`, `/remove`, `/leaderboard/json`).
+    endpoint: String,
+    /// Average latency in milliseconds across all recorded requests.
+    avg_ms: f64,
+    /// Total number of requests recorded for this endpoint.
+    count: u64,
+}
+
+// ---------------------------------------------------------------------------
+// Handlers
+// ---------------------------------------------------------------------------
+
+/// Check whether the service is up and running.
 #[utoipa::path(
     get,
     path = "/health",
     responses(
-        (status = 200, description = "Health check", body = HealthResponse)
+        (status = 200, description = "Service is healthy", body = HealthResponse)
     ),
     tag = "health"
 )]
@@ -68,6 +93,22 @@ async fn health_handler() -> Json<HealthResponse> {
     })
 }
 
+/// Submit or replace a participant's score.
+///
+/// If the participant (`key`) already has a score on the leaderboard it is
+/// deleted before the new one is inserted, so each participant always has at
+/// most one active score.  The old value is still preserved in the score
+/// history.  The key is silently truncated to 32 characters.
+#[utoipa::path(
+    post,
+    path = "/add",
+    request_body = AddRequest,
+    responses(
+        (status = 200, description = "Score accepted and recorded", body = Score),
+        (status = 500, description = "Database error")
+    ),
+    tag = "scores"
+)]
 async fn add_handler(
     State(state): State<AppState>,
     Json(req): Json<AddRequest>,
@@ -90,6 +131,24 @@ async fn add_handler(
     Ok(Json(new_score))
 }
 
+/// Remove a participant's score from the leaderboard.
+///
+/// Deletes the active score for the given `uploader`.  The score history is
+/// **not** affected.  The uploader value is silently truncated to 32
+/// characters.
+#[utoipa::path(
+    delete,
+    path = "/remove/{uploader}",
+    params(
+        ("uploader" = String, Path, description = "Participant identifier (max 32 characters)")
+    ),
+    responses(
+        (status = 200, description = "Score deleted successfully"),
+        (status = 404, description = "No score found for the given uploader"),
+        (status = 500, description = "Database error")
+    ),
+    tag = "scores"
+)]
 async fn remove_handler(State(state): State<AppState>, Path(uploader): Path<String>) -> StatusCode {
     let mut uploader: String = uploader;
     uploader.truncate(32);
@@ -104,13 +163,19 @@ async fn remove_handler(State(state): State<AppState>, Path(uploader): Path<Stri
     }
 }
 
-#[derive(Serialize)]
-struct PerformanceEntry {
-    endpoint: String,
-    avg_ms: f64,
-    count: u64,
-}
-
+/// Retrieve per-endpoint latency and request-count metrics.
+///
+/// Returns an alphabetically sorted list of all endpoints that have received
+/// at least one request since the server started.  The `/performance` endpoint
+/// itself is excluded from tracking.
+#[utoipa::path(
+    get,
+    path = "/performance",
+    responses(
+        (status = 200, description = "Endpoint performance metrics", body = Vec<PerformanceEntry>)
+    ),
+    tag = "metrics"
+)]
 async fn performance_handler(State(state): State<AppState>) -> Json<Vec<PerformanceEntry>> {
     let metrics = state.metrics.read().await;
     let mut entries: Vec<PerformanceEntry> = metrics
@@ -129,6 +194,19 @@ async fn performance_handler(State(state): State<AppState>) -> Json<Vec<Performa
     Json(entries)
 }
 
+/// Get aggregate statistics for all scores currently on the leaderboard.
+///
+/// Returns descriptive statistics including mean, median, standard deviation,
+/// percentiles, and more.
+#[utoipa::path(
+    get,
+    path = "/info",
+    responses(
+        (status = 200, description = "Score statistics", body = ScoreStats),
+        (status = 500, description = "Database error")
+    ),
+    tag = "scores"
+)]
 async fn info_handler(State(state): State<AppState>) -> Result<Json<ScoreStats>, StatusCode> {
     Ok(Json(
         Score::get_score_stats(&state.db)
@@ -137,16 +215,46 @@ async fn info_handler(State(state): State<AppState>) -> Result<Json<ScoreStats>,
     ))
 }
 
+/// Get score submission history.
+///
+/// Returns historical score submissions optionally filtered by participant key
+/// and/or a datetime range.
+///
+/// **Note:** this endpoint is not yet implemented and will return `501 Not Implemented`.
+#[utoipa::path(
+    get,
+    path = "/history",
+    params(HistoryQuery),
+    responses(
+        (status = 501, description = "Not yet implemented")
+    ),
+    tag = "scores"
+)]
 async fn history_handler(State(_state): State<AppState>, Query(_params): Query<HistoryQuery>) {
     todo!()
 }
 
-#[derive(Serialize)]
-struct BoardConfigResponse {
+/// Response body describing the current leaderboard configuration.
+#[derive(Serialize, ToSchema)]
+pub struct BoardConfigResponse {
+    /// Human-readable title of the leaderboard.
     title: String,
+    /// Whether scores are ranked from highest-to-lowest or lowest-to-highest.
     sort_order: LeaderboardSortOrder,
 }
 
+/// Get the current leaderboard display configuration.
+///
+/// Returns the leaderboard title and sort order as configured in `config.toml`
+/// (or updated via `PATCH /admin/config`).
+#[utoipa::path(
+    get,
+    path = "/boardconfig",
+    responses(
+        (status = 200, description = "Current board configuration", body = BoardConfigResponse)
+    ),
+    tag = "config"
+)]
 async fn board_config_handler(State(state): State<AppState>) -> Json<BoardConfigResponse> {
     let config = state.config.read().await;
     Json(BoardConfigResponse {
@@ -155,15 +263,66 @@ async fn board_config_handler(State(state): State<AppState>) -> Json<BoardConfig
     })
 }
 
+// ---------------------------------------------------------------------------
+// OpenAPI document
+// ---------------------------------------------------------------------------
+
 #[derive(OpenApi)]
 #[openapi(
-    paths(health_handler),
-    components(schemas(HealthResponse)),
+    info(
+        title = "Luddy Hackathon SP26 API",
+        version = "1.0.0",
+        description = "REST API for the Luddy Hackathon SP26 leaderboard service.
+Participants submit scores via `/add` and the server maintains a live ranked \
+leaderboard.  Administrative operations (e.g. updating the board title or sort \
+order) require a Bearer token in the `Authorization` header."
+    ),
+    paths(
+        // Health
+        health_handler,
+        // Scores
+        add_handler,
+        remove_handler,
+        info_handler,
+        history_handler,
+        // Leaderboard
+        routes::leaderboard::get_leaderboard,
+        routes::leaderboard::get_leaderboard_json,
+        routes::leaderboard::get_leaderboard_num,
+        routes::leaderboard::get_leaderboard_json_num,
+        // Admin
+        routes::admin::update_config_handler,
+        // Config / Metrics
+        board_config_handler,
+        performance_handler,
+    ),
+    components(
+        schemas(
+            HealthResponse,
+            AddRequest,
+            HistoryQuery,
+            PerformanceEntry,
+            BoardConfigResponse,
+            Score,
+            ScoreStats,
+            LeaderboardSortOrder,
+            Config,
+        )
+    ),
     tags(
-        (name = "health", description = "Health check endpoints")
+        (name = "health",  description = "Service liveness checks"),
+        (name = "scores",  description = "Score submission, removal, and statistics"),
+        (name = "leaderboard", description = "Ranked leaderboard views (plain-text and JSON)"),
+        (name = "admin",   description = "Protected administrative operations (Bearer token required)"),
+        (name = "config",  description = "Read the current leaderboard configuration"),
+        (name = "metrics", description = "Internal request-latency metrics"),
     )
 )]
 pub struct ApiDoc;
+
+// ---------------------------------------------------------------------------
+// Middleware
+// ---------------------------------------------------------------------------
 
 async fn metrics_middleware(
     State(state): State<AppState>,
@@ -195,6 +354,10 @@ async fn metrics_middleware(
 
     response
 }
+
+// ---------------------------------------------------------------------------
+// Router
+// ---------------------------------------------------------------------------
 
 pub fn app(state: AppState) -> Router {
     let cors = CorsLayer::new()

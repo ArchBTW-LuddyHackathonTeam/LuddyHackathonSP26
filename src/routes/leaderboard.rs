@@ -5,6 +5,7 @@ use axum::{
     Json, Router,
 };
 use tabled::{settings::Style, Table};
+use utoipa::IntoParams;
 
 use crate::{models::score::Score, router::AppState};
 
@@ -16,7 +17,26 @@ pub fn router() -> Router<AppState> {
         .route("/json/{num}", get(get_leaderboard_json_num))
 }
 
-/// Returns a pretty-print version of the top 10 on the leaderboard
+/// Path parameter for leaderboard size.
+#[derive(IntoParams)]
+struct NumParam {
+    /// Maximum number of entries to return.
+    num: i32,
+}
+
+/// Get the top-10 leaderboard as a Markdown table.
+///
+/// Returns a human-readable Markdown-formatted table of the top 10 scores,
+/// sorted according to the configured sort order.
+#[utoipa::path(
+    get,
+    path = "/leaderboard",
+    responses(
+        (status = 200, description = "Markdown table of the top-10 scores", content_type = "text/plain"),
+        (status = 500, description = "Database error")
+    ),
+    tag = "leaderboard"
+)]
 pub async fn get_leaderboard(State(state): State<AppState>) -> Result<String, StatusCode> {
     let scores: Vec<Score> =
         Score::leaderboard(&state.db, state.config.read().await.leaderboard.sort_order)
@@ -29,7 +49,19 @@ pub async fn get_leaderboard(State(state): State<AppState>) -> Result<String, St
     Ok(table.to_string())
 }
 
-/// Returns a json version of the top 10 on the leaderboard
+/// Get the top-10 leaderboard as JSON.
+///
+/// Returns the top 10 scores as a JSON array, sorted according to the
+/// configured sort order.
+#[utoipa::path(
+    get,
+    path = "/leaderboard/json",
+    responses(
+        (status = 200, description = "JSON array of top-10 scores", body = Vec<Score>),
+        (status = 500, description = "Database error")
+    ),
+    tag = "leaderboard"
+)]
 pub async fn get_leaderboard_json(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<Score>>, StatusCode> {
@@ -40,7 +72,22 @@ pub async fn get_leaderboard_json(
     ))
 }
 
-/// Returns a pretty-print version of the top num on the leaderboard
+/// Get the top-N leaderboard as a Markdown table.
+///
+/// Returns a human-readable Markdown-formatted table of the top `num` scores,
+/// sorted according to the configured sort order.
+#[utoipa::path(
+    get,
+    path = "/leaderboard/{num}",
+    params(
+        ("num" = i32, Path, description = "Maximum number of leaderboard entries to return")
+    ),
+    responses(
+        (status = 200, description = "Markdown table of the top-N scores", content_type = "text/plain"),
+        (status = 500, description = "Database error")
+    ),
+    tag = "leaderboard"
+)]
 pub async fn get_leaderboard_num(
     State(state): State<AppState>,
     Path(num): Path<i32>,
@@ -59,7 +106,22 @@ pub async fn get_leaderboard_num(
     Ok(table.to_string())
 }
 
-/// Returns a json version of the top num on the leaderboard
+/// Get the top-N leaderboard as JSON.
+///
+/// Returns the top `num` scores as a JSON array, sorted according to the
+/// configured sort order.
+#[utoipa::path(
+    get,
+    path = "/leaderboard/json/{num}",
+    params(
+        ("num" = i32, Path, description = "Maximum number of leaderboard entries to return")
+    ),
+    responses(
+        (status = 200, description = "JSON array of top-N scores", body = Vec<Score>),
+        (status = 500, description = "Database error")
+    ),
+    tag = "leaderboard"
+)]
 pub async fn get_leaderboard_json_num(
     State(state): State<AppState>,
     Path(num): Path<i32>,

@@ -1,35 +1,64 @@
 use serde::Serialize;
 use sqlx::{prelude::FromRow, PgPool};
 use tabled::Tabled;
+use utoipa::{openapi, ToSchema};
 
 use crate::config::LeaderboardSortOrder;
 
 const LEADERBOARD_SIZE: i32 = 10;
 
-#[derive(Debug, FromRow, Serialize, Tabled)]
+fn datetime_schema() -> openapi::schema::Object {
+    openapi::schema::ObjectBuilder::new()
+        .schema_type(openapi::schema::Type::String)
+        .format(Some(openapi::schema::SchemaFormat::KnownFormat(
+            openapi::schema::KnownFormat::DateTime,
+        )))
+        .build()
+}
+
+/// A participant's current leaderboard entry.
+#[derive(Debug, FromRow, Serialize, Tabled, ToSchema)]
 pub struct Score {
+    /// The participant's unique identifier.
     #[tabled(order = 0)]
     pub uploader: String,
+    /// Timestamp when this score was first recorded (UTC).
     #[tabled(order = 2)]
+    #[schema(schema_with = datetime_schema)]
     pub created_at: time::PrimitiveDateTime,
+    /// The numeric score value.
     #[tabled[order = 1]]
     pub value: f64,
 }
 
-#[derive(Debug, FromRow, Serialize)]
+/// Descriptive statistics computed across all current leaderboard scores.
+#[derive(Debug, FromRow, Serialize, ToSchema)]
 pub struct ScoreStats {
+    /// Total number of scores on the leaderboard.
     pub count: Option<i64>,
+    /// Arithmetic mean of all scores.
     pub mean: Option<f64>,
+    /// Median (50th percentile) score.
     pub median: Option<f64>,
+    /// Lowest score.
     pub min: Option<f64>,
+    /// Highest score.
     pub max: Option<f64>,
+    /// Difference between the highest and lowest score.
     pub range: Option<f64>,
+    /// Sample standard deviation.
     pub stddev: Option<f64>,
+    /// Population standard deviation.
     pub stddev_pop: Option<f64>,
+    /// Sample variance.
     pub variance: Option<f64>,
+    /// 25th percentile score.
     pub p25: Option<f64>,
+    /// 75th percentile score.
     pub p75: Option<f64>,
+    /// Interquartile range (p75 − p25).
     pub iqr: Option<f64>,
+    /// Most frequently occurring score value.
     pub mode: Option<f64>,
 }
 
