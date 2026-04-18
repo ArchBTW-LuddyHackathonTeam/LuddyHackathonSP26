@@ -1,12 +1,17 @@
 use serde::Serialize;
-use sqlx::{PgPool, prelude::FromRow};
+use sqlx::{prelude::FromRow, PgPool};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(Serialize, Debug, FromRow)]
+#[derive(Serialize, Debug, FromRow, ToSchema)]
 pub struct ScoreHistory {
+    /// Unique identifier for this history entry.
     pub id: Uuid,
+    /// The participant's identifier.
     pub uploader: String,
+    /// Timestamp when this score was submitted (UTC).
     pub created_at: time::PrimitiveDateTime,
+    /// The score value that was submitted.
     pub value: f64,
 }
 

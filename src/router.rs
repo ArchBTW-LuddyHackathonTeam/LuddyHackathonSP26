@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use axum::{
-    extract::{Path, Query, Request, State},
+    extract::{Path, Request, State},
     http::StatusCode,
     middleware::Next,
     response::Response,
@@ -11,7 +11,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use tower_http::cors::{Any, CorsLayer};
-use utoipa::{IntoParams, OpenApi, ToSchema};
+use utoipa::{OpenApi, ToSchema};
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
@@ -50,17 +50,6 @@ pub struct AddRequest {
     key: String,
     /// The score value to record.
     value: f64,
-}
-
-/// Query parameters for the score history endpoint.
-#[derive(Deserialize, ToSchema, IntoParams)]
-pub struct HistoryQuery {
-    /// Filter history by this participant key.
-    key: Option<String>,
-    /// ISO-8601 start datetime (inclusive).
-    start: Option<String>,
-    /// ISO-8601 end datetime (inclusive).
-    end: Option<String>,
 }
 
 /// A single entry in the per-endpoint performance report.
@@ -214,25 +203,6 @@ async fn info_handler(State(state): State<AppState>) -> Result<Json<ScoreStats>,
     ))
 }
 
-/// Get score submission history.
-///
-/// Returns historical score submissions optionally filtered by participant key
-/// and/or a datetime range.
-///
-/// **Note:** this endpoint is not yet implemented and will return `501 Not Implemented`.
-#[utoipa::path(
-    get,
-    path = "/history",
-    params(HistoryQuery),
-    responses(
-        (status = 501, description = "Not yet implemented")
-    ),
-    tag = "scores"
-)]
-async fn history_handler(State(_state): State<AppState>, Query(_params): Query<HistoryQuery>) {
-    todo!()
-}
-
 /// Response body describing the current leaderboard configuration.
 #[derive(Serialize, ToSchema)]
 pub struct BoardConfigResponse {
@@ -283,7 +253,8 @@ order) require a Bearer token in the `Authorization` header."
         add_handler,
         remove_handler,
         info_handler,
-        history_handler,
+        routes::history::get_history,
+        routes::history::user_history,
         // Leaderboard
         routes::leaderboard::get_leaderboard,
         routes::leaderboard::get_leaderboard_json,
@@ -299,11 +270,11 @@ order) require a Bearer token in the `Authorization` header."
         schemas(
             HealthResponse,
             AddRequest,
-            HistoryQuery,
             PerformanceEntry,
             BoardConfigResponse,
             Score,
             ScoreStats,
+            ScoreHistory,
             LeaderboardSortOrder,
             Config,
         )

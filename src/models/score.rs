@@ -1,20 +1,11 @@
 use serde::Serialize;
 use sqlx::{prelude::FromRow, PgPool};
 use tabled::Tabled;
-use utoipa::{openapi, ToSchema};
+use utoipa::ToSchema;
 
 use crate::config::LeaderboardSortOrder;
 
 const LEADERBOARD_SIZE: i32 = 10;
-
-fn datetime_schema() -> openapi::schema::Object {
-    openapi::schema::ObjectBuilder::new()
-        .schema_type(openapi::schema::Type::String)
-        .format(Some(openapi::schema::SchemaFormat::KnownFormat(
-            openapi::schema::KnownFormat::DateTime,
-        )))
-        .build()
-}
 
 /// A participant's current leaderboard entry.
 #[derive(Debug, FromRow, Serialize, Tabled, ToSchema)]
@@ -24,7 +15,6 @@ pub struct Score {
     pub uploader: String,
     /// Timestamp when this score was first recorded (UTC).
     #[tabled(order = 2)]
-    #[schema(schema_with = datetime_schema)]
     pub created_at: time::PrimitiveDateTime,
     /// The numeric score value.
     #[tabled[order = 1]]
@@ -61,10 +51,8 @@ pub struct ScoreStats {
     /// Most frequently occurring score value.
     pub mode: Option<f64>,
     /// Timestamp of the earliest score entry.
-    #[schema(schema_with = datetime_schema)]
     pub earliest_at: Option<time::PrimitiveDateTime>,
     /// Timestamp of the latest score entry.
-    #[schema(schema_with = datetime_schema)]
     pub latest_at: Option<time::PrimitiveDateTime>,
 }
 
