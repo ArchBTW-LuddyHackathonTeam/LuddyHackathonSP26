@@ -1,13 +1,12 @@
-use std::{io::ErrorKind, sync::Arc};
+use std::io::ErrorKind;
 
 use clap::Parser;
 use luddy_hackathon_sp26::{
-    config::{Config, LeaderboardConfig, ServerConfig},
+    config::{Config, LeaderboardConfig, LeaderboardSortOrder, ServerConfig},
     models::token::Token,
     router::{self, AppState},
 };
 use sqlx::postgres::PgPoolOptions;
-use tokio::sync::RwLock;
 
 #[derive(Parser)]
 struct Args {
@@ -45,7 +44,7 @@ async fn main() {
                 server: ServerConfig { port: 3000 },
                 leaderboard: LeaderboardConfig {
                     title: String::from("Example"),
-                    sort_order: String::from("descending"),
+                    sort_order: LeaderboardSortOrder::Descending,
                 },
             };
             config

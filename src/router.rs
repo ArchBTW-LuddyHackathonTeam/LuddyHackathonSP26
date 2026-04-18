@@ -7,7 +7,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::Config,
+    config::{Config, LeaderboardSortOrder},
     models::{score::Score, score_history::ScoreHistory},
     routes,
 };
@@ -87,7 +87,7 @@ struct BoardNameResponse {
 #[derive(Serialize)]
 struct BoardConfigResponse {
     title: String,
-    sort_order: String,
+    sort_order: LeaderboardSortOrder,
 }
 
 async fn board_name_handler(State(state): State<AppState>) -> Json<BoardNameResponse> {

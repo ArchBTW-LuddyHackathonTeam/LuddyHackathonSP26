@@ -1,7 +1,7 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize, Clone, Copy, Debug)]
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum LeaderboardSortOrder {
     Descending,
@@ -16,7 +16,7 @@ pub struct ServerConfig {
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct LeaderboardConfig {
     pub title: String,
-    pub sort_order: String,
+    pub sort_order: LeaderboardSortOrder,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]

@@ -7,12 +7,16 @@ use axum::{
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
-use crate::{config::Config, models::token::Token, router::AppState};
+use crate::{
+    config::{Config, LeaderboardSortOrder},
+    models::token::Token,
+    router::AppState,
+};
 
 #[derive(Deserialize)]
 pub struct UpdateConfigRequest {
     title: Option<String>,
-    sort_order: Option<String>,
+    sort_order: Option<LeaderboardSortOrder>,
 }
 
 async fn update_config_handler(
@@ -44,7 +48,9 @@ async fn update_config_handler(
     }
 
     if let Some(sort_order) = req.sort_order {
-        if sort_order != "ascending" && sort_order != "descending" {
+        if sort_order != LeaderboardSortOrder::Ascending
+            && sort_order != LeaderboardSortOrder::Descending
+        {
             return Err(StatusCode::BAD_REQUEST);
         }
         config.leaderboard.sort_order = sort_order;
