@@ -3,12 +3,19 @@ use std::io::ErrorKind;
 use clap::Parser;
 use luddy_hackathon_sp26::{
     config::{Config, LeaderboardConfig, ServerConfig},
+    models::token::Token,
     router::{self, AppState},
 };
+use sha2::{Digest, Sha256};
 use sqlx::postgres::PgPoolOptions;
+use uuid::Uuid;
 
 #[derive(Parser)]
-struct Args {}
+struct Args {
+    /// Reset the administrator token
+    #[arg(long)]
+    reset_password: bool,
+}
 
 #[tokio::main]
 async fn main() {
@@ -50,7 +57,20 @@ async fn main() {
         Err(e) => panic!("There was an error loading the config.toml file: {}", e),
     };
 
-    println!("Admin Secret: {}", todo!("implement database for secrets"));
+    if !Token::any_exists(&pool)
+        .await
+        .expect("There was an issue fetching tokens from the database")
+    {
+        let new_token = Uuid::new_v4();
+        let mut h = Sha256::new();
+        h.update(new_token);
+        Token::create(&pool, hex::encode(h.finalize()))
+            .await
+            .expect("There was an issue registering a new token");
+        println!("Admin Secret (new): {}", new_token);
+    } else if args.reset_password {
+        todo!("implement clear+add(random)")
+    }
 
     let state = AppState { db: pool, config };
 
