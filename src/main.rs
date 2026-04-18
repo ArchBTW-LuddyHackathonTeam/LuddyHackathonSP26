@@ -1,4 +1,5 @@
 use clap::Parser;
+use luddy_hackathon_sp26::router::{self, AppState};
 use sqlx::postgres::PgPoolOptions;
 use uuid::Uuid;
 
@@ -28,4 +29,18 @@ async fn main() {
 
     let secret = Uuid::new_v4();
     println!("Admin Secret: {}", secret);
+
+    let state = AppState { db: pool, secret };
+
+    let app = router::app(state);
+
+    // TOOD: Grab from env or toml?
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
+        .await
+        .expect("Couldn't create TCP listener");
+
+    println!("Listening on localhost:3000");
+    axum::serve(listener, app)
+        .await
+        .expect("There was an error serving the app")
 }
