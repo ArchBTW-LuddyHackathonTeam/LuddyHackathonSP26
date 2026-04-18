@@ -1,10 +1,28 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 #[derive(Deserialize, Serialize, Clone, Copy, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum LeaderboardSortOrder {
+    Descending,
+    Ascending,
+}
+
+#[derive(Deserialize, Serialize, Clone, Copy, Debug)]
+pub struct ServerConfig {
+    pub port: u16,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct LeaderboardConfig {
+    pub title: String,
+    pub sort_order: String,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Config {
-    pub secret: Uuid,
+    pub server: ServerConfig,
+    pub leaderboard: LeaderboardConfig,
 }
 
 impl Config {

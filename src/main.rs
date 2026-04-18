@@ -2,11 +2,10 @@ use std::io::ErrorKind;
 
 use clap::Parser;
 use luddy_hackathon_sp26::{
-    config::Config,
+    config::{Config, LeaderboardConfig, ServerConfig},
     router::{self, AppState},
 };
 use sqlx::postgres::PgPoolOptions;
-use uuid::Uuid;
 
 #[derive(Parser)]
 struct Args {}
@@ -37,7 +36,11 @@ async fn main() {
         }
         Err(e) if e.kind() == ErrorKind::NotFound => {
             config = Config {
-                secret: Uuid::new_v4(),
+                server: ServerConfig { port: 3000 },
+                leaderboard: LeaderboardConfig {
+                    title: String::from("Example"),
+                    sort_order: String::from("descending"),
+                },
             };
             config
                 .save()
@@ -47,7 +50,7 @@ async fn main() {
         Err(e) => panic!("There was an error loading the config.toml file: {}", e),
     };
 
-    println!("Admin Secret: {}", config.secret);
+    println!("Admin Secret: {}", todo!("implement database for secrets"));
 
     let state = AppState { db: pool, config };
 
