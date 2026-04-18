@@ -1,29 +1,40 @@
-let mockLeaderboard = [
-    { username: "Alice", score: 95.75 },
-    { username: "Bob", score: 87.50 },
-    { username: "Charlie", score: 82.25 },
-    { username: "Diana", score: 78.00 },
-    { username: "Eve", score: 75.33 },
-    { username: "Frank", score: 69.67 },
-    { username: "Grace", score: 64.12 },
-    { username: "Henry", score: 58.99 },
-    { username: "Iris", score: 52.45 },
-    { username: "Jack", score: 47.88 }
-];
-
-let mockPerformance = {
-    add: 12,
-    remove: 8,
-    leaderboard: 15,
-    info: 10
-};
-
 const API_BASE_URL = 'http://localhost:3000';
 
+let leaderboardData = [];
+let statsData = {
+    total: 0,
+    mean: 0,
+    median: 0,
+    stdDev: 0,
+    min: 0,
+    max: 0
+};
+let performanceData = {
+    add: 0,
+    remove: 0,
+    leaderboard: 0,
+    info: 0
+};
+
 document.addEventListener('DOMContentLoaded', () => {
-    render();
     setupEvents();
+    fetchLeaderboard();
+    loadBoardTitle();
+    // Refresh leaderboard every 2 seconds
+    setInterval(fetchLeaderboard, 2000);
 });
+
+async function loadBoardTitle() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/boardconfig`);
+        if (response.ok) {
+            const config = await response.json();
+            document.querySelector('header h1').textContent = config.title;
+        }
+    } catch (error) {
+        console.error('Failed to load board title:', error);
+    }
+}
 
 let stressTestInterval = null;
 let stressTestRunning = false;
@@ -40,6 +51,27 @@ function setupEvents() {
     document.getElementById('updateTitleForm').addEventListener('submit', handleUpdateTitle);
     document.getElementById('updateSortForm').addEventListener('submit', handleUpdateSort);
     document.getElementById('logoutAdmin').addEventListener('click', handleAdminLogout);
+}
+
+async function fetchLeaderboard() {
+    try {
+        const start = performance.now();
+        const response = await fetch(`${API_BASE_URL}/leaderboard/json`);
+        const duration = Math.round(performance.now() - start);
+
+        if (response.ok) {
+            const data = await response.json();
+            // Convert API format (uploader, value) to display format (username, score)
+            leaderboardData = data.map(entry => ({
+                username: entry.uploader,
+                score: entry.value
+            }));
+            performanceData.leaderboard = duration;
+            render();
+        }
+    } catch (error) {
+        console.error('Failed to fetch leaderboard:', error);
+    }
 }
 
 function toggleView() {
@@ -67,34 +99,54 @@ async function handleAdd(e) {
 
     if (!username || isNaN(score)) return;
 
-    const index = mockLeaderboard.findIndex(e => e.username === username);
-    if (index !== -1) {
-        mockLeaderboard[index].score = score;
-    } else {
-        mockLeaderboard.push({ username, score });
+    try {
+        const start = performance.now();
+        const response = await fetch(`${API_BASE_URL}/add`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: username, value: score })
+        });
+        const duration = Math.round(performance.now() - start);
+        performanceData.add = duration;
+
+        if (response.ok) {
+            document.getElementById('addEntryForm').reset();
+            showStatus('Added');
+            await fetchLeaderboard();
+        } else {
+            showStatus('Failed to add', true);
+        }
+    } catch (error) {
+        showStatus('Error: ' + error.message, true);
     }
-
-    mockLeaderboard.sort((a, b) => b.score - a.score);
-
-    document.getElementById('addEntryForm').reset();
-    render();
-    showStatus('Added');
 }
 
 async function handleRemove(e) {
     e.preventDefault();
     const username = document.getElementById('removeUsername').value.trim();
 
-    const index = mockLeaderboard.findIndex(e => e.username === username);
-    if (index !== -1) {
-        mockLeaderboard.splice(index, 1);
-        showStatus('Removed');
-    } else {
-        showStatus('Not found', true);
-    }
+    if (!username) return;
 
-    document.getElementById('removeEntryForm').reset();
-    render();
+    try {
+        const start = performance.now();
+        const response = await fetch(`${API_BASE_URL}/remove/${encodeURIComponent(username)}`, {
+            method: 'DELETE'
+        });
+        const duration = Math.round(performance.now() - start);
+        performanceData.remove = duration;
+
+        if (response.ok) {
+            document.getElementById('removeEntryForm').reset();
+            showStatus('Removed');
+            await fetchLeaderboard();
+        } else if (response.status === 404) {
+            showStatus('Not found', true);
+        } else {
+            showStatus('Failed to remove', true);
+        }
+    } catch (error) {
+        showStatus('Error: ' + error.message, true);
+    }
 }
 
 function render() {
@@ -105,7 +157,12 @@ function render() {
 
 function renderLeaderboard() {
     const el = document.getElementById('leaderboard');
-    const top10 = mockLeaderboard.slice(0, 10);
+    const top10 = leaderboardData.slice(0, 10);
+
+    if (top10.length === 0) {
+        el.innerHTML = '<div style="text-align: center; padding: 20px; color: #888;">No entries yet</div>';
+        return;
+    }
 
     el.innerHTML = top10.map((entry, i) => `
         <div class="leaderboard-item">
@@ -117,7 +174,7 @@ function renderLeaderboard() {
 }
 
 function renderStats() {
-    const scores = mockLeaderboard.map(e => e.score);
+    const scores = leaderboardData.map(e => e.score);
     const n = scores.length;
 
     if (n === 0) {
@@ -148,10 +205,10 @@ function renderStats() {
 }
 
 function renderPerformance() {
-    document.getElementById('addPerf').textContent = mockPerformance.add + 'ms';
-    document.getElementById('removePerf').textContent = mockPerformance.remove + 'ms';
-    document.getElementById('leaderboardPerf').textContent = mockPerformance.leaderboard + 'ms';
-    document.getElementById('infoPerf').textContent = mockPerformance.info + 'ms';
+    document.getElementById('addPerf').textContent = performanceData.add + 'ms';
+    document.getElementById('removePerf').textContent = performanceData.remove + 'ms';
+    document.getElementById('leaderboardPerf').textContent = performanceData.leaderboard + 'ms';
+    document.getElementById('infoPerf').textContent = performanceData.info + 'ms';
 }
 
 function showStatus(msg, isError = false) {
@@ -176,22 +233,20 @@ function startStressTest() {
     document.getElementById('stressStatus').textContent = 'Running...';
 
     let count = 0;
-    stressTestInterval = setInterval(() => {
+    stressTestInterval = setInterval(async () => {
         const username = `User${Math.floor(Math.random() * 10000)}`;
         const score = parseFloat((Math.random() * 10000).toFixed(2));
 
-        const index = mockLeaderboard.findIndex(e => e.username === username);
-        if (index !== -1) {
-            mockLeaderboard[index].score = score;
-        } else {
-            mockLeaderboard.push({ username, score });
-        }
-
-        mockLeaderboard.sort((a, b) => b.score - a.score);
-        count++;
-
-        if (count % 10 === 0) {
-            render();
+        try {
+            await fetch(`${API_BASE_URL}/add`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key: username, value: score })
+            });
+            count++;
+            document.getElementById('stressStatus').textContent = `Running... (${count} requests)`;
+        } catch (error) {
+            console.error('Stress test error:', error);
         }
     }, 100);
 }
@@ -205,7 +260,7 @@ function stopStressTest() {
     document.getElementById('stopStress').disabled = true;
     document.getElementById('stressStatus').textContent = 'Idle';
 
-    render();
+    fetchLeaderboard();
 }
 
 async function handleAdminAuth(e) {
@@ -229,6 +284,7 @@ async function handleAdminAuth(e) {
             document.getElementById('adminAuthSection').style.display = 'none';
             document.getElementById('adminPanel').style.display = 'flex';
             showStatus('Admin authenticated');
+            await loadBoardConfig();
         } else {
             showStatus('Invalid admin token', true);
             document.getElementById('adminStatus').textContent = 'Authentication failed';
@@ -238,6 +294,19 @@ async function handleAdminAuth(e) {
         showStatus('Authentication error', true);
         document.getElementById('adminStatus').textContent = 'Error';
         document.getElementById('adminStatus').className = 'admin-status error';
+    }
+}
+
+async function loadBoardConfig() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/boardconfig`);
+        if (response.ok) {
+            const config = await response.json();
+            document.getElementById('newTitle').placeholder = `Current: ${config.title}`;
+            document.getElementById('sortOrder').value = config.sort_order;
+        }
+    } catch (error) {
+        console.error('Failed to load board config:', error);
     }
 }
 
@@ -260,6 +329,8 @@ async function handleUpdateTitle(e) {
         if (response.ok) {
             showStatus('Title updated');
             document.getElementById('updateTitleForm').reset();
+            await loadBoardTitle();
+            await loadBoardConfig();
         } else {
             showStatus('Failed to update title', true);
         }
@@ -286,7 +357,8 @@ async function handleUpdateSort(e) {
 
         if (response.ok) {
             showStatus('Sort order updated');
-            document.getElementById('updateSortForm').reset();
+            await loadBoardConfig();
+            await fetchLeaderboard();
         } else {
             showStatus('Failed to update sort order', true);
         }
@@ -305,37 +377,31 @@ function handleAdminLogout() {
     showStatus('Logged out');
 }
 
+// API helper functions for console debugging
 window.api = {
     async add(username, score) {
         const res = await fetch(`${API_BASE_URL}/add`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, score })
+            body: JSON.stringify({ key: username, value: score })
         });
         return res.json();
     },
 
     async remove(username) {
-        const res = await fetch(`${API_BASE_URL}/remove`, {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username })
+        const res = await fetch(`${API_BASE_URL}/remove/${encodeURIComponent(username)}`, {
+            method: 'DELETE'
         });
-        return res.json();
+        return res.status;
     },
 
     async getLeaderboard() {
-        const res = await fetch(`${API_BASE_URL}/leaderboard`);
+        const res = await fetch(`${API_BASE_URL}/leaderboard/json`);
         return res.json();
     },
 
-    async getInfo() {
-        const res = await fetch(`${API_BASE_URL}/info`);
-        return res.json();
-    },
-
-    async getPerformance() {
-        const res = await fetch(`${API_BASE_URL}/performance`);
+    async getBoardConfig() {
+        const res = await fetch(`${API_BASE_URL}/boardconfig`);
         return res.json();
     }
 };
