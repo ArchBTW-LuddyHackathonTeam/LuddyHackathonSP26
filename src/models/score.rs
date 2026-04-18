@@ -161,8 +161,8 @@ impl Score {
             PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY value)
                 - PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY value)  AS "iqr",
             MODE()                WITHIN GROUP (ORDER BY value)        AS "mode",
-            MIN(created_at)                                                 AS "earliest_at",
-            MAX(created_at)                                                 AS "latest_at"
+            (SELECT MIN(created_at) FROM score_history)                AS "earliest_at",
+            (SELECT MAX(created_at) FROM score_history)                AS "latest_at"
         FROM score
         "#,
         )

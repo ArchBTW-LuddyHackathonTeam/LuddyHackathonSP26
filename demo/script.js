@@ -20,10 +20,14 @@ const PAGE_SIZE = 15;
 let minTimestamp = null;
 let maxTimestamp = null;
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     initializeCharts();
     bindEvents();
     fetchConfig();
+
+    // Fetch initial data before starting intervals to avoid race condition
+    await refreshData();
+    await fetchHistory();
 
     setInterval(refreshData, 1000);
     setInterval(fetchHistory, 1000);
