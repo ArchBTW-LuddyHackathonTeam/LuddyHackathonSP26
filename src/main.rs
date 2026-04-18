@@ -1,4 +1,4 @@
-use std::{io::ErrorKind, sync::Arc};
+use std::{collections::HashMap, io::ErrorKind, sync::Arc};
 
 use clap::Parser;
 use luddy_hackathon_sp26::{
@@ -83,6 +83,7 @@ async fn main() {
     let state = AppState {
         db: pool,
         config: Arc::new(RwLock::new(config)),
+        metrics: Arc::new(RwLock::new(HashMap::new())),
     };
 
     let app = router::app(state);

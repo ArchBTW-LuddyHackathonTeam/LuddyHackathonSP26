@@ -1,14 +1,6 @@
 const API_BASE_URL = 'http://localhost:3000';
 
 let leaderboardData = [];
-let statsData = {
-    total: 0,
-    mean: 0,
-    median: 0,
-    stdDev: 0,
-    min: 0,
-    max: 0
-};
 let performanceData = {
     add: 0,
     remove: 0,
@@ -20,8 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEvents();
     fetchLeaderboard();
     loadBoardTitle();
-    // Refresh leaderboard every 2 seconds
-    setInterval(fetchLeaderboard, 2000);
+    setInterval(fetchLeaderboard, 100);
 });
 
 async function loadBoardTitle() {
@@ -61,7 +52,6 @@ async function fetchLeaderboard() {
 
         if (response.ok) {
             const data = await response.json();
-            // Convert API format (uploader, value) to display format (username, score)
             leaderboardData = data.map(entry => ({
                 username: entry.uploader,
                 score: entry.value
@@ -151,8 +141,55 @@ async function handleRemove(e) {
 
 function render() {
     renderLeaderboard();
-    renderStats();
-    renderPerformance();
+    fetchStats();
+    fetchPerformance();
+}
+
+function fmt(v) {
+    return v != null
+        ? v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : '0';
+}
+
+async function fetchStats() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/info`);
+        if (response.ok) {
+            const data = await response.json();
+            document.getElementById('totalEntries').textContent = data.count ?? 0;
+            document.getElementById('meanScore').textContent = fmt(data.mean);
+            document.getElementById('medianScore').textContent = fmt(data.median);
+            document.getElementById('stdDev').textContent = fmt(data.stddev_pop);
+            document.getElementById('q1Score').textContent = fmt(data.p25);
+            document.getElementById('q3Score').textContent = fmt(data.p75);
+            document.getElementById('minScore').textContent = fmt(data.min);
+            document.getElementById('maxScore').textContent = fmt(data.max);
+        }
+    } catch (error) {
+        console.error('Failed to fetch stats:', error);
+    }
+}
+
+async function fetchPerformance() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/performance`);
+        if (response.ok) {
+            const data = await response.json();
+            const lookup = {};
+            data.forEach(e => lookup[e.endpoint] = e.avg_ms);
+
+            document.getElementById('addPerf').textContent =
+                (lookup['/add'] || 0).toFixed(1) + 'ms';
+            document.getElementById('removePerf').textContent =
+                (lookup['/remove'] || 0).toFixed(1) + 'ms';
+            document.getElementById('leaderboardPerf').textContent =
+                (lookup['/leaderboard/json'] || 0).toFixed(1) + 'ms';
+            document.getElementById('infoPerf').textContent =
+                (lookup['/info'] || 0).toFixed(1) + 'ms';
+        }
+    } catch (error) {
+        console.error('Failed to fetch performance:', error);
+    }
 }
 
 function renderLeaderboard() {
@@ -171,44 +208,6 @@ function renderLeaderboard() {
             <span class="score">${entry.score.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
         </div>
     `).join('');
-}
-
-function renderStats() {
-    const scores = leaderboardData.map(e => e.score);
-    const n = scores.length;
-
-    if (n === 0) {
-        document.getElementById('totalEntries').textContent = '0';
-        document.getElementById('meanScore').textContent = '0';
-        document.getElementById('medianScore').textContent = '0';
-        document.getElementById('stdDev').textContent = '0';
-        document.getElementById('minScore').textContent = '0';
-        document.getElementById('maxScore').textContent = '0';
-        return;
-    }
-
-    const mean = scores.reduce((a, b) => a + b, 0) / n;
-    const sorted = [...scores].sort((a, b) => a - b);
-    const median = n % 2 === 0
-        ? (sorted[n/2 - 1] + sorted[n/2]) / 2
-        : sorted[Math.floor(n/2)];
-
-    const variance = scores.reduce((sum, x) => sum + Math.pow(x - mean, 2), 0) / n;
-    const stdDev = Math.sqrt(variance);
-
-    document.getElementById('totalEntries').textContent = n;
-    document.getElementById('meanScore').textContent = mean.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
-    document.getElementById('medianScore').textContent = median.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
-    document.getElementById('stdDev').textContent = stdDev.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
-    document.getElementById('minScore').textContent = Math.min(...scores).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
-    document.getElementById('maxScore').textContent = Math.max(...scores).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
-}
-
-function renderPerformance() {
-    document.getElementById('addPerf').textContent = performanceData.add + 'ms';
-    document.getElementById('removePerf').textContent = performanceData.remove + 'ms';
-    document.getElementById('leaderboardPerf').textContent = performanceData.leaderboard + 'ms';
-    document.getElementById('infoPerf').textContent = performanceData.info + 'ms';
 }
 
 function showStatus(msg, isError = false) {
@@ -234,8 +233,8 @@ function startStressTest() {
 
     let count = 0;
     stressTestInterval = setInterval(async () => {
-        const username = `User${Math.floor(Math.random() * 10000)}`;
-        const score = parseFloat((Math.random() * 10000).toFixed(2));
+        const username = `User${Math.floor(Math.random() * 100000)}`;
+        const score = parseFloat((Math.random() * 100000).toFixed(2));
 
         try {
             await fetch(`${API_BASE_URL}/add`, {
@@ -243,12 +242,13 @@ function startStressTest() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ key: username, value: score })
             });
+            if (!stressTestRunning) return;
             count++;
             document.getElementById('stressStatus').textContent = `Running... (${count} requests)`;
         } catch (error) {
             console.error('Stress test error:', error);
         }
-    }, 100);
+    }, 0);
 }
 
 function stopStressTest() {
