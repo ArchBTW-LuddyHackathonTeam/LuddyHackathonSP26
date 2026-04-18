@@ -9,7 +9,7 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 use tower_http::cors::{Any, CorsLayer};
 use utoipa::{IntoParams, OpenApi, ToSchema};
 use utoipa_swagger_ui::SwaggerUi;
@@ -23,6 +23,8 @@ use crate::{
     routes,
 };
 
+const LOCK_SHARDS: usize = 1024;
+
 #[derive(Clone, Default)]
 pub struct EndpointMetrics {
     pub count: u64,
@@ -34,6 +36,7 @@ pub struct AppState {
     pub db: sqlx::PgPool,
     pub config: Arc<RwLock<Config>>,
     pub metrics: Arc<RwLock<HashMap<String, EndpointMetrics>>>,
+    pub uploader_locks: Arc<[Mutex<()>; LOCK_SHARDS]>,
 }
 
 /// Response body for the health check endpoint.
@@ -115,6 +118,15 @@ async fn add_handler(
 ) -> Result<Json<Score>, StatusCode> {
     let mut uploader = req.key;
     uploader.truncate(32);
+
+    // Locking the database for clientes with the same uploader
+    let shard = {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        uploader.hash(&mut h);
+        (h.finish() as usize) % LOCK_SHARDS
+    };
+    let _guard = state.uploader_locks[shard].lock().await;
 
     Score::delete_by_uploader(&state.db, &uploader)
         .await
