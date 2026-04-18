@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Query, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     routing::{delete, get, post},
     Json, Router,
@@ -21,11 +21,6 @@ pub struct AppState {
 pub struct AddRequest {
     key: String, // max 32 chars
     value: f64,
-}
-
-#[derive(Deserialize)]
-pub struct RemoveRequest {
-    key: String, // max 32 chars
 }
 
 #[derive(Deserialize)]
@@ -58,8 +53,18 @@ async fn add_handler(
     Ok(Json(new_score))
 }
 
-async fn remove_handler(State(_state): State<AppState>, Json(_req): Json<RemoveRequest>) {
-    todo!()
+async fn remove_handler(State(state): State<AppState>, Path(uploader): Path<String>) -> StatusCode {
+    let mut uploader: String = uploader;
+    uploader.truncate(32);
+
+    match Score::delete_by_uploader(&state.db, &uploader).await {
+        Ok(value) => match value {
+            0 => StatusCode::NOT_FOUND,
+            1 => StatusCode::OK,
+            _ => StatusCode::INTERNAL_SERVER_ERROR,
+        },
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
 }
 
 async fn performance_handler(State(_state): State<AppState>) {
