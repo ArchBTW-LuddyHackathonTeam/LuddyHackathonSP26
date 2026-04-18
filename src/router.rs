@@ -4,7 +4,7 @@ use axum::{
     extract::{Path, Request, State},
     http::StatusCode,
     middleware::Next,
-    response::Response,
+    response::{Html, Response},
     routing::{delete, get, post},
     Json, Router,
 };
@@ -218,6 +218,10 @@ async fn board_config_handler(State(state): State<AppState>) -> Json<BoardConfig
     })
 }
 
+async fn demo_handler() -> Html<&'static str> {
+    Html(include_str!("../demo/index.html"))
+}
+
 // ---------------------------------------------------------------------------
 // OpenAPI document
 // ---------------------------------------------------------------------------
@@ -322,6 +326,8 @@ pub fn app(state: AppState) -> Router {
         .allow_headers(Any);
 
     Router::new()
+        .route("/", get(demo_handler))
+        .merge(routes::demo::router())
         .route("/health", get(health_handler))
         .route("/add", post(add_handler))
         .route("/remove/{uploader}", delete(remove_handler))
