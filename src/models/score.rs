@@ -76,11 +76,18 @@ impl Score {
 
     /// Insert a new score and return the created record
     pub async fn create(pool: &PgPool, uploader: &String, value: f64) -> Result<Self, sqlx::Error> {
-        sqlx::query_as("INSERT INTO score (uploader, value) VALUES ($1, $2) RETURNING uploader, created_at, value")
-                .bind(uploader)
-                .bind(value)
-                .fetch_one(pool)
-                .await
+        sqlx::query_as(
+            r#"INSERT INTO score (uploader, value, created_at)
+            VALUES ($1, $2, NOW())
+            ON CONFLICT (uploader) DO UPDATE
+              SET value = EXCLUDED.value,
+                  created_at = EXCLUDED.created_at
+            RETURNING *"#,
+        )
+        .bind(uploader)
+        .bind(value)
+        .fetch_one(pool)
+        .await
     }
 
     /// Delete this score. Returns the number of rows affected.

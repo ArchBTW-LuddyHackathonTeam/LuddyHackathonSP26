@@ -7,7 +7,7 @@ use luddy_hackathon_sp26::{
     router::{self, AppState},
 };
 use sqlx::postgres::PgPoolOptions;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::RwLock;
 
 #[derive(Parser)]
 struct Args {
@@ -84,7 +84,6 @@ async fn main() {
         db: pool,
         config: Arc::new(RwLock::new(config)),
         metrics: Arc::new(RwLock::new(HashMap::new())),
-        uploader_locks: Arc::new(std::array::from_fn(|_| Mutex::new(()))),
     };
 
     let app = router::app(state);

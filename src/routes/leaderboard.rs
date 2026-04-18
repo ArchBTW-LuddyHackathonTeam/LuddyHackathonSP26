@@ -5,7 +5,6 @@ use axum::{
     Json, Router,
 };
 use tabled::{settings::Style, Table};
-use utoipa::IntoParams;
 
 use crate::{models::score::Score, router::AppState};
 
@@ -15,13 +14,6 @@ pub fn router() -> Router<AppState> {
         .route("/json", get(get_leaderboard_json))
         .route("/{num}", get(get_leaderboard_num))
         .route("/json/{num}", get(get_leaderboard_json_num))
-}
-
-/// Path parameter for leaderboard size.
-#[derive(IntoParams)]
-struct NumParam {
-    /// Maximum number of entries to return.
-    num: i32,
 }
 
 /// Get the top-10 leaderboard as a Markdown table.
