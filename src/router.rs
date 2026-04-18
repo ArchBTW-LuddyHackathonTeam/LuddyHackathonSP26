@@ -9,6 +9,8 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use tower_http::cors::{Any, CorsLayer};
+use utoipa::{OpenApi, ToSchema};
+use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
     config::{Config, LeaderboardSortOrder},
@@ -22,6 +24,11 @@ pub struct AppState {
     pub config: Arc<RwLock<Config>>,
 }
 
+#[derive(Serialize, ToSchema)]
+pub struct HealthResponse {
+    status: String,
+}
+
 #[derive(Deserialize)]
 pub struct AddRequest {
     key: String,
@@ -33,6 +40,20 @@ pub struct HistoryQuery {
     key: Option<String>,
     start: Option<String>,
     end: Option<String>,
+}
+
+#[utoipa::path(
+    get,
+    path = "/health",
+    responses(
+        (status = 200, description = "Health check", body = HealthResponse)
+    ),
+    tag = "health"
+)]
+async fn health_handler() -> Json<HealthResponse> {
+    Json(HealthResponse {
+        status: "OK".to_string(),
+    })
 }
 
 async fn add_handler(
@@ -97,6 +118,16 @@ async fn board_config_handler(State(state): State<AppState>) -> Json<BoardConfig
     })
 }
 
+#[derive(OpenApi)]
+#[openapi(
+    paths(health_handler),
+    components(schemas(HealthResponse)),
+    tags(
+        (name = "health", description = "Health check endpoints")
+    )
+)]
+pub struct ApiDoc;
+
 pub fn app(state: AppState) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(Any)
@@ -104,7 +135,7 @@ pub fn app(state: AppState) -> Router {
         .allow_headers(Any);
 
     Router::new()
-        .route("/health", get(|| async { "OK" }))
+        .route("/health", get(health_handler))
         .route("/add", post(add_handler))
         .route("/remove/{uploader}", delete(remove_handler))
         .route("/performance", get(performance_handler))
@@ -114,5 +145,9 @@ pub fn app(state: AppState) -> Router {
         .nest("/admin", routes::admin::router())
         .nest("/leaderboard", routes::leaderboard::router())
         .layer(cors)
+        .merge(
+            SwaggerUi::new("/swagger-ui")
+                .url("/api-docs/openapi.json", ApiDoc::openapi())
+        )
         .with_state(state)
 }
