@@ -8,6 +8,7 @@ use axum::{
     routing::{delete, get, post},
     Json, Router,
 };
+use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use tower_http::cors::{Any, CorsLayer};
@@ -34,6 +35,7 @@ pub struct AppState {
     pub db: sqlx::PgPool,
     pub config: Arc<RwLock<Config>>,
     pub metrics: Arc<RwLock<HashMap<String, EndpointMetrics>>>,
+    pub pending: Arc<DashMap<String, f64>>,
 }
 
 /// Response body for the health check endpoint.
@@ -47,9 +49,9 @@ pub struct HealthResponse {
 #[derive(Deserialize, ToSchema)]
 pub struct AddRequest {
     /// The participant's unique identifier (max 32 characters).
-    key: String,
+    pub key: String,
     /// The score value to record.
-    value: f64,
+    pub value: f64,
 }
 
 /// A single entry in the per-endpoint performance report.
@@ -93,26 +95,14 @@ async fn health_handler() -> Json<HealthResponse> {
     path = "/add",
     request_body = AddRequest,
     responses(
-        (status = 200, description = "Score accepted and recorded", body = Score),
+        (status = 202, description = "Score has been accepted and queued for write"),
         (status = 500, description = "Database error")
     ),
     tag = "scores"
 )]
-async fn add_handler(
-    State(state): State<AppState>,
-    Json(req): Json<AddRequest>,
-) -> Result<Json<Score>, StatusCode> {
-    let mut uploader = req.key;
-    uploader.truncate(32);
-
-    let new_score = Score::create(&state.db, &uploader, req.value)
-        .await
-        .map_err(|e| {
-            eprintln!("{:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-    Ok(Json(new_score))
+async fn add_handler(State(state): State<AppState>, Json(req): Json<AddRequest>) -> StatusCode {
+    state.pending.insert(req.key, req.value);
+    StatusCode::ACCEPTED
 }
 
 /// Remove a participant's score from the leaderboard.

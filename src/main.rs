@@ -1,7 +1,9 @@
 use std::{collections::HashMap, io::ErrorKind, sync::Arc};
 
 use clap::Parser;
+use dashmap::DashMap;
 use luddy_hackathon_sp26::{
+    coalescer::run_coalescer,
     config::{Config, LeaderboardConfig, LeaderboardSortOrder, ServerConfig},
     models::token::Token,
     router::{self, AppState},
@@ -20,7 +22,7 @@ struct Args {
 async fn main() {
     let args = Args::parse();
     let pool = PgPoolOptions::new()
-        .max_connections(100)
+        .max_connections(20)
         .connect(
             std::env::var("DATABASE_URL")
                 .expect("The database url environment variable does not exist")
@@ -84,7 +86,13 @@ async fn main() {
         db: pool,
         config: Arc::new(RwLock::new(config)),
         metrics: Arc::new(RwLock::new(HashMap::new())),
+        pending: Arc::new(DashMap::new()),
     };
+
+    let state_clone = state.clone();
+    tokio::spawn(async move {
+        run_coalescer(state_clone).await;
+    });
 
     let app = router::app(state);
 
